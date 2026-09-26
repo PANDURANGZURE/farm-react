@@ -6,28 +6,12 @@ function Navbar() {
 
       <div className="flex h-full items-center justify-between px-8">
 
-        {/* Search */}
-        <div className="relative w-80">
-          <Search
-            size={18}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-          />
-
-          <input
-            type="text"
-            placeholder="Search..."
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-500/10"
-          />
-        </div>
+        
 
         {/* Right */}
         <div className="flex items-center gap-5">
 
-          <button className="relative rounded-xl p-2.5 text-slate-500 transition hover:bg-slate-100">
-            <Bell size={20} />
-
-            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500" />
-          </button>
+        
 
           <div className="h-8 w-px bg-slate-200" />
 
