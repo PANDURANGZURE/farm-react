@@ -23,6 +23,17 @@ from egg import (
     delete_egg
 )
 
+# ==========================================
+# EXPENSE FUNCTIONS
+# ==========================================
+
+from expense import (
+    get_all_expenses,
+    add_expense,
+    update_expense,
+    delete_expense
+)
+
 
 # ==========================================
 # FLASK APP
@@ -33,9 +44,9 @@ app = Flask(__name__)
 CORS(app)
 
 
-# ==========================================
-# HOME / TEST ROUTE
-# ==========================================
+# ==========================================================
+# HOME / TEST
+# ==========================================================
 
 @app.route("/", methods=["GET"])
 def home():
@@ -52,7 +63,7 @@ def home():
 
 
 # ==========================================
-# GET ALL MILK RECORDS
+# GET ALL MILK
 # ==========================================
 
 @app.route("/api/milk", methods=["GET"])
@@ -76,7 +87,7 @@ def get_milk():
 
 
 # ==========================================
-# ADD MILK RECORD
+# ADD MILK
 # ==========================================
 
 @app.route("/api/milk", methods=["POST"])
@@ -142,7 +153,7 @@ def create_milk():
 
 
 # ==========================================
-# UPDATE MILK RECORD
+# UPDATE MILK
 # ==========================================
 
 @app.route("/api/milk/<int:milk_id>", methods=["PUT"])
@@ -215,7 +226,7 @@ def edit_milk(milk_id):
 
 
 # ==========================================
-# DELETE MILK RECORD
+# DELETE MILK
 # ==========================================
 
 @app.route("/api/milk/<int:milk_id>", methods=["DELETE"])
@@ -251,7 +262,7 @@ def remove_milk(milk_id):
 
 
 # ==========================================
-# GET ALL EGG RECORDS
+# GET ALL EGGS
 # ==========================================
 
 @app.route("/api/eggs", methods=["GET"])
@@ -275,7 +286,7 @@ def get_eggs():
 
 
 # ==========================================
-# ADD EGG RECORD
+# ADD EGG
 # ==========================================
 
 @app.route("/api/eggs", methods=["POST"])
@@ -341,7 +352,7 @@ def create_egg():
 
 
 # ==========================================
-# UPDATE EGG RECORD
+# UPDATE EGG
 # ==========================================
 
 @app.route("/api/eggs/<int:egg_id>", methods=["PUT"])
@@ -414,7 +425,7 @@ def edit_egg(egg_id):
 
 
 # ==========================================
-# DELETE EGG RECORD
+# DELETE EGG
 # ==========================================
 
 @app.route("/api/eggs/<int:egg_id>", methods=["DELETE"])
@@ -444,9 +455,210 @@ def remove_egg(egg_id):
         }), 500
 
 
+# ==========================================================
+#                       EXPENSES
+# ==========================================================
+
+
 # ==========================================
-# RUN FLASK SERVER
+# GET ALL EXPENSES
 # ==========================================
+
+@app.route("/api/expenses", methods=["GET"])
+def get_expenses():
+
+    try:
+
+        records = get_all_expenses()
+
+        return jsonify({
+            "success": True,
+            "records": records
+        })
+
+    except Exception as e:
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+# ==========================================
+# ADD EXPENSE
+# ==========================================
+
+@app.route("/api/expenses", methods=["POST"])
+def create_expense():
+
+    try:
+
+        data = request.get_json()
+
+        if not data:
+
+            return jsonify({
+                "success": False,
+                "error": "Request body is required"
+            }), 400
+
+        expense_date = data.get("expense_date")
+        category = data.get("category")
+        description = data.get("description", "")
+        amount = data.get("amount")
+
+        if not expense_date or not category or amount is None:
+
+            return jsonify({
+                "success": False,
+                "error": "Date, category and amount are required"
+            }), 400
+
+        amount = float(amount)
+
+        if amount <= 0:
+
+            return jsonify({
+                "success": False,
+                "error": "Amount must be greater than 0"
+            }), 400
+
+        expense_id = add_expense(
+            expense_date,
+            category,
+            description,
+            amount
+        )
+
+        return jsonify({
+            "success": True,
+            "message": "Expense added successfully",
+            "expense_id": expense_id
+        }), 201
+
+    except ValueError:
+
+        return jsonify({
+            "success": False,
+            "error": "Amount must be a valid number"
+        }), 400
+
+    except Exception as e:
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+# ==========================================
+# UPDATE EXPENSE
+# ==========================================
+
+@app.route("/api/expenses/<int:expense_id>", methods=["PUT"])
+def edit_expense(expense_id):
+
+    try:
+
+        data = request.get_json()
+
+        if not data:
+
+            return jsonify({
+                "success": False,
+                "error": "Request body is required"
+            }), 400
+
+        expense_date = data.get("expense_date")
+        category = data.get("category")
+        description = data.get("description", "")
+        amount = data.get("amount")
+
+        if not expense_date or not category or amount is None:
+
+            return jsonify({
+                "success": False,
+                "error": "Date, category and amount are required"
+            }), 400
+
+        amount = float(amount)
+
+        if amount <= 0:
+
+            return jsonify({
+                "success": False,
+                "error": "Amount must be greater than 0"
+            }), 400
+
+        affected_rows = update_expense(
+            expense_id,
+            expense_date,
+            category,
+            description,
+            amount
+        )
+
+        if affected_rows == 0:
+
+            return jsonify({
+                "success": False,
+                "error": "Expense not found"
+            }), 404
+
+        return jsonify({
+            "success": True,
+            "message": "Expense updated successfully"
+        })
+
+    except ValueError:
+
+        return jsonify({
+            "success": False,
+            "error": "Amount must be a valid number"
+        }), 400
+
+    except Exception as e:
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+# ==========================================
+# DELETE EXPENSE
+# ==========================================
+
+@app.route("/api/expenses/<int:expense_id>", methods=["DELETE"])
+def remove_expense(expense_id):
+
+    try:
+
+        affected_rows = delete_expense(expense_id)
+
+        if affected_rows == 0:
+
+            return jsonify({
+                "success": False,
+                "error": "Expense not found"
+            }), 404
+
+        return jsonify({
+            "success": True,
+            "message": "Expense deleted successfully"
+        })
+
+    except Exception as e:
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+# ==========================================================
+#                    RUN FLASK SERVER
+# ==========================================================
 
 if __name__ == "__main__":
 

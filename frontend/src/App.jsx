@@ -6,6 +6,7 @@ import Navbar from "./components/Navbar"
 import Dashboard from "./pages/Dashboard"
 import Milk from "./pages/Milk"
 import Eggs from "./pages/Eggs"
+import Expenses from "./pages/Expenses"
 
 
 function App() {
@@ -23,6 +24,9 @@ function App() {
 
       case "Eggs":
         return <Eggs />
+
+      case "Expenses":
+        return <Expenses />
 
       case "Dashboard":
       default:
