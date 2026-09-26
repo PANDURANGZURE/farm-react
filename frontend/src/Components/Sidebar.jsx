@@ -28,7 +28,7 @@ const menuItems = [
     name: "Sales",
     icon: ShoppingCart,
   },
- 
+  
 ]
 
 function Sidebar({ activePage, setActivePage }) {
@@ -43,7 +43,7 @@ function Sidebar({ activePage, setActivePage }) {
 
         <div>
           <h1 className="font-bold tracking-wide text-white">
-            Farm
+            Agri Pocket
           </h1>
 
           <p className="text-xs text-slate-500">

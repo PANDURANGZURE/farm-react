@@ -1,22 +1,24 @@
 import { useEffect, useMemo, useState } from "react"
-
 import {
+  Wallet,
   Plus,
   Search,
   Pencil,
   Trash2,
-  Wallet,
-  IndianRupee,
-  Receipt,
   X,
   CalendarDays,
-  FileText,
-  Tag,
+  TrendingDown,
+  IndianRupee,
+  Receipt,
+  Package,
+  Stethoscope,
+  Users,
+  Zap,
+  Wrench,
+  Truck,
 } from "lucide-react"
 
-
-const API_URL = "http://127.0.0.1:5000"
-
+const API_URL = "http://127.0.0.1:5000/api/expenses"
 
 const categories = [
   "Feed",
@@ -29,21 +31,27 @@ const categories = [
   "Other",
 ]
 
+const categoryIcons = {
+  Feed: Package,
+  Medicine: Stethoscope,
+  Labour: Users,
+  Electricity: Zap,
+  Equipment: Wrench,
+  Transportation: Truck,
+  Maintenance: Wrench,
+  Other: Receipt,
+}
 
 function Expenses() {
-
-  const [expenses, setExpenses] = useState([])
-
+  const [records, setRecords] = useState([])
   const [loading, setLoading] = useState(true)
 
   const [search, setSearch] = useState("")
+  const [dateFilter, setDateFilter] = useState("7days")
 
   const [showModal, setShowModal] = useState(false)
-
-  const [editingExpense, setEditingExpense] = useState(null)
-
-  const [deletingId, setDeletingId] = useState(null)
-
+  const [editingRecord, setEditingRecord] = useState(null)
+  const [deleteId, setDeleteId] = useState(null)
 
   const [form, setForm] = useState({
     expense_date: new Date().toISOString().split("T")[0],
@@ -52,78 +60,146 @@ function Expenses() {
     amount: "",
   })
 
-
-  // ==========================================
-  // FETCH EXPENSES
-  // ==========================================
+  // =========================
+  // FETCH DATA
+  // =========================
 
   const fetchExpenses = async () => {
-
     try {
-
       setLoading(true)
 
-      const response = await fetch(
-        `${API_URL}/api/expenses`
-      )
-
+      const response = await fetch(API_URL)
       const data = await response.json()
 
       if (data.success) {
-
-        setExpenses(data.records)
-
-      } else {
-
-        alert(data.error || "Failed to load expenses")
-
+        setRecords(data.records)
       }
-
     } catch (error) {
-
-      console.error(error)
-
-      alert("Unable to connect to backend")
-
+      console.error("Error fetching expenses:", error)
     } finally {
-
       setLoading(false)
-
     }
-
   }
-
 
   useEffect(() => {
-
     fetchExpenses()
-
   }, [])
 
+  // =========================
+  // DATE FILTER
+  // =========================
 
-  // ==========================================
-  // FORM INPUT
-  // ==========================================
+  const getStartDate = () => {
+    const today = new Date()
+    const start = new Date(today)
 
-  const handleChange = (e) => {
+    if (dateFilter === "7days") {
+      start.setDate(today.getDate() - 6)
+    }
 
-    const { name, value } = e.target
+    if (dateFilter === "1month") {
+      start.setMonth(today.getMonth() - 1)
+    }
 
-    setForm((previous) => ({
-      ...previous,
-      [name]: value,
-    }))
+    if (dateFilter === "6months") {
+      start.setMonth(today.getMonth() - 6)
+    }
 
+    if (dateFilter === "1year") {
+      start.setFullYear(today.getFullYear() - 1)
+    }
+
+    start.setHours(0, 0, 0, 0)
+
+    return start
   }
 
+  // =========================
+  // FILTERED DATA
+  // =========================
 
-  // ==========================================
-  // OPEN ADD MODAL
-  // ==========================================
+  const filteredRecords = useMemo(() => {
+    let result = [...records]
+
+    if (dateFilter !== "all") {
+      const startDate = getStartDate()
+
+      const today = new Date()
+      today.setHours(23, 59, 59, 999)
+
+      result = result.filter((record) => {
+        const date = new Date(record.expense_date)
+
+        return date >= startDate && date <= today
+      })
+    }
+
+    if (search.trim()) {
+      const value = search.toLowerCase()
+
+      result = result.filter(
+        (record) =>
+          record.category.toLowerCase().includes(value) ||
+          (record.description || "").toLowerCase().includes(value) ||
+          record.expense_date.toLowerCase().includes(value)
+      )
+    }
+
+    return result
+  }, [records, dateFilter, search])
+
+  // =========================
+  // STATISTICS
+  // =========================
+
+  const totalExpenses = filteredRecords.reduce(
+    (sum, record) => sum + Number(record.amount),
+    0
+  )
+
+  const averageExpense =
+    filteredRecords.length > 0
+      ? totalExpenses / filteredRecords.length
+      : 0
+
+  const highestExpense =
+    filteredRecords.length > 0
+      ? Math.max(...filteredRecords.map((record) => Number(record.amount)))
+      : 0
+
+  // =========================
+  // CATEGORY ANALYSIS
+  // =========================
+
+  const categoryTotals = useMemo(() => {
+    const totals = {}
+
+    filteredRecords.forEach((record) => {
+      const category = record.category
+
+      totals[category] =
+        (totals[category] || 0) + Number(record.amount)
+    })
+
+    return Object.entries(totals)
+      .map(([category, amount]) => ({
+        category,
+        amount,
+      }))
+      .sort((a, b) => b.amount - a.amount)
+  }, [filteredRecords])
+
+  const maxCategoryAmount =
+    categoryTotals.length > 0
+      ? categoryTotals[0].amount
+      : 1
+
+  // =========================
+  // FORM
+  // =========================
 
   const openAddModal = () => {
-
-    setEditingExpense(null)
+    setEditingRecord(null)
 
     setForm({
       expense_date: new Date().toISOString().split("T")[0],
@@ -133,782 +209,469 @@ function Expenses() {
     })
 
     setShowModal(true)
-
   }
 
-
-  // ==========================================
-  // OPEN EDIT MODAL
-  // ==========================================
-
-  const openEditModal = (expense) => {
-
-    setEditingExpense(expense)
+  const openEditModal = (record) => {
+    setEditingRecord(record)
 
     setForm({
-      expense_date: expense.expense_date,
-      category: expense.category,
-      description: expense.description || "",
-      amount: expense.amount,
+      expense_date: record.expense_date,
+      category: record.category,
+      description: record.description || "",
+      amount: record.amount,
     })
 
     setShowModal(true)
-
   }
-
-
-  // ==========================================
-  // CLOSE MODAL
-  // ==========================================
 
   const closeModal = () => {
-
     setShowModal(false)
-
-    setEditingExpense(null)
-
+    setEditingRecord(null)
   }
 
+  const handleChange = (e) => {
+    setForm({
+      ...form,
+      [e.target.name]: e.target.value,
+    })
+  }
 
-  // ==========================================
-  // ADD / UPDATE EXPENSE
-  // ==========================================
+  // =========================
+  // ADD / UPDATE
+  // =========================
 
   const handleSubmit = async (e) => {
-
     e.preventDefault()
-
 
     if (
       !form.expense_date ||
       !form.category ||
       !form.amount
     ) {
-
-      alert("Please fill all required fields")
-
+      alert("Please fill all required fields.")
       return
-
     }
-
-
-    if (Number(form.amount) <= 0) {
-
-      alert("Amount must be greater than 0")
-
-      return
-
-    }
-
 
     try {
+      const url = editingRecord
+        ? `${API_URL}/${editingRecord.expense_id}`
+        : API_URL
 
-      const url = editingExpense
-        ? `${API_URL}/api/expenses/${editingExpense.expense_id}`
-        : `${API_URL}/api/expenses`
-
-
-      const method = editingExpense
-        ? "PUT"
-        : "POST"
-
+      const method = editingRecord ? "PUT" : "POST"
 
       const response = await fetch(url, {
-
         method,
-
         headers: {
           "Content-Type": "application/json",
         },
-
         body: JSON.stringify({
           expense_date: form.expense_date,
           category: form.category,
           description: form.description,
           amount: Number(form.amount),
         }),
-
       })
 
-
       const data = await response.json()
 
-
-      if (!response.ok || !data.success) {
-
-        alert(data.error || "Something went wrong")
-
-        return
-
+      if (data.success) {
+        closeModal()
+        fetchExpenses()
+      } else {
+        alert(data.message || "Operation failed.")
       }
-
-
-      closeModal()
-
-      fetchExpenses()
-
     } catch (error) {
-
       console.error(error)
-
-      alert("Unable to connect to backend")
-
+      alert("Server error.")
     }
-
   }
 
+  // =========================
+  // DELETE
+  // =========================
 
-  // ==========================================
-  // DELETE EXPENSE
-  // ==========================================
-
-  const handleDelete = async (expenseId) => {
-
-    const confirmDelete = window.confirm(
-      "Are you sure you want to delete this expense?"
-    )
-
-
-    if (!confirmDelete) {
-
-      return
-
-    }
-
+  const handleDelete = async () => {
+    if (!deleteId) return
 
     try {
-
-      setDeletingId(expenseId)
-
-
-      const response = await fetch(
-        `${API_URL}/api/expenses/${expenseId}`,
-        {
-          method: "DELETE",
-        }
-      )
-
+      const response = await fetch(`${API_URL}/${deleteId}`, {
+        method: "DELETE",
+      })
 
       const data = await response.json()
 
-
-      if (!response.ok || !data.success) {
-
-        alert(data.error || "Unable to delete expense")
-
-        return
-
+      if (data.success) {
+        setDeleteId(null)
+        fetchExpenses()
+      } else {
+        alert(data.message || "Delete failed.")
       }
-
-
-      fetchExpenses()
-
     } catch (error) {
-
       console.error(error)
-
-      alert("Unable to connect to backend")
-
-    } finally {
-
-      setDeletingId(null)
-
+      alert("Server error.")
     }
-
   }
-
-
-  // ==========================================
-  // SEARCH
-  // ==========================================
-
-  const filteredExpenses = useMemo(() => {
-
-    const query = search.toLowerCase().trim()
-
-
-    if (!query) {
-
-      return expenses
-
-    }
-
-
-    return expenses.filter((expense) => {
-
-      return (
-        expense.category?.toLowerCase().includes(query) ||
-        expense.description?.toLowerCase().includes(query) ||
-        expense.expense_date?.toLowerCase().includes(query)
-      )
-
-    })
-
-  }, [expenses, search])
-
-
-  // ==========================================
-  // STATISTICS
-  // ==========================================
-
-  const totalExpenses = useMemo(() => {
-
-    return expenses.reduce(
-      (sum, expense) =>
-        sum + Number(expense.amount || 0),
-      0
-    )
-
-  }, [expenses])
-
-
-  const averageExpense = useMemo(() => {
-
-    if (expenses.length === 0) {
-
-      return 0
-
-    }
-
-    return totalExpenses / expenses.length
-
-  }, [expenses, totalExpenses])
-
-
-  const highestExpense = useMemo(() => {
-
-    if (expenses.length === 0) {
-
-      return 0
-
-    }
-
-    return Math.max(
-      ...expenses.map((expense) =>
-        Number(expense.amount || 0)
-      )
-    )
-
-  }, [expenses])
-
-
-  // ==========================================
-  // FORMAT CURRENCY
-  // ==========================================
-
-  const formatCurrency = (amount) => {
-
-    return Number(amount || 0).toLocaleString(
-      "en-IN",
-      {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }
-    )
-
-  }
-
 
   return (
+    <div className="space-y-6">
 
-    <div className="space-y-8">
+      {/* HEADER */}
+      <div className="rounded-3xl bg-gradient-to-r from-orange-500 via-orange-600 to-red-500 p-8 text-white shadow-xl">
 
+        <div className="flex flex-col justify-between gap-6 md:flex-row md:items-center">
 
-      {/* ==========================================
-          HEADER
-      ========================================== */}
+          <div>
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20">
+                <TrendingDown size={25} />
+              </div>
 
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-
-        <div>
-
-          <div className="flex items-center gap-3">
-
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-100">
-
-              <Wallet
-                size={24}
-                className="text-red-600"
-              />
-
+              <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-semibold">
+                Cost Management
+              </span>
             </div>
 
-            <div>
+            <h1 className="text-3xl font-bold">
+              Farm Expenses
+            </h1>
 
-              <h1 className="text-3xl font-bold text-slate-900">
-                Expenses
-              </h1>
-
-              <p className="mt-1 text-sm text-slate-500">
-                Track and manage farm expenses
-              </p>
-
-            </div>
-
+            <p className="mt-2 max-w-xl text-orange-100">
+              Monitor your farm spending and understand where your money goes.
+            </p>
           </div>
 
+          <button
+            onClick={openAddModal}
+            className="flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 font-semibold text-orange-600 shadow-lg transition hover:bg-orange-50"
+          >
+            <Plus size={19} />
+            Add Expense
+          </button>
+
         </div>
-
-
-        <button
-          onClick={openAddModal}
-          className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
-        >
-
-          <Plus size={18} />
-
-          Add Expense
-
-        </button>
-
       </div>
 
+      {/* FILTER */}
+      
 
-      {/* ==========================================
-          STAT CARDS
-      ========================================== */}
+      {/* STAT CARDS */}
+      <div className="grid gap-5 md:grid-cols-3">
 
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-
-
-        {/* TOTAL */}
-
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-
+        <div className="rounded-2xl border border-orange-100 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between">
-
-            <div>
-
-              <p className="text-sm font-medium text-slate-500">
-                Total Expenses
-              </p>
-
-              <h2 className="mt-2 text-2xl font-bold text-slate-900">
-                ₹{formatCurrency(totalExpenses)}
-              </h2>
-
+            <div className="rounded-xl bg-orange-50 p-3 text-orange-600">
+              <IndianRupee size={22} />
             </div>
 
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-100">
-
-              <IndianRupee
-                size={20}
-                className="text-red-600"
-              />
-
-            </div>
-
+            <span className="text-xs font-semibold text-orange-500">
+              TOTAL
+            </span>
           </div>
 
+          <p className="mt-5 text-sm text-slate-500">
+            Total Expenses
+          </p>
+
+          <h2 className="mt-1 text-3xl font-bold text-slate-900">
+            ₹{totalExpenses.toLocaleString("en-IN", {
+              maximumFractionDigits: 2,
+            })}
+          </h2>
         </div>
 
-
-        {/* AVERAGE */}
-
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-
+        <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between">
-
-            <div>
-
-              <p className="text-sm font-medium text-slate-500">
-                Average Expense
-              </p>
-
-              <h2 className="mt-2 text-2xl font-bold text-slate-900">
-                ₹{formatCurrency(averageExpense)}
-              </h2>
-
+            <div className="rounded-xl bg-red-50 p-3 text-red-600">
+              <Receipt size={22} />
             </div>
 
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-100">
-
-              <Receipt
-                size={20}
-                className="text-orange-600"
-              />
-
-            </div>
-
+            <span className="text-xs font-semibold text-red-500">
+              AVERAGE
+            </span>
           </div>
 
+          <p className="mt-5 text-sm text-slate-500">
+            Average Expense
+          </p>
+
+          <h2 className="mt-1 text-3xl font-bold text-slate-900">
+            ₹{averageExpense.toLocaleString("en-IN", {
+              maximumFractionDigits: 2,
+            })}
+          </h2>
         </div>
 
-
-        {/* HIGHEST */}
-
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-
+        <div className="rounded-2xl border border-amber-100 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between">
-
-            <div>
-
-              <p className="text-sm font-medium text-slate-500">
-                Highest Expense
-              </p>
-
-              <h2 className="mt-2 text-2xl font-bold text-slate-900">
-                ₹{formatCurrency(highestExpense)}
-              </h2>
-
+            <div className="rounded-xl bg-amber-50 p-3 text-amber-600">
+              <TrendingDown size={22} />
             </div>
 
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-100">
-
-              <Wallet
-                size={20}
-                className="text-purple-600"
-              />
-
-            </div>
-
+            <span className="text-xs font-semibold text-amber-500">
+              HIGHEST
+            </span>
           </div>
 
+          <p className="mt-5 text-sm text-slate-500">
+            Highest Expense
+          </p>
+
+          <h2 className="mt-1 text-3xl font-bold text-slate-900">
+            ₹{highestExpense.toLocaleString("en-IN", {
+              maximumFractionDigits: 2,
+            })}
+          </h2>
         </div>
 
       </div>
 
+      {/* ANALYSIS */}
+      <div className="grid gap-6 lg:grid-cols-5">
 
-      {/* ==========================================
-          SEARCH
-      ========================================== */}
+        {/* CATEGORY BREAKDOWN */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-2">
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-6">
+            <h2 className="text-lg font-bold text-slate-900">
+              Spending by Category
+            </h2>
 
-        <div className="relative">
+            <p className="mt-1 text-sm text-slate-500">
+              Where your farm money is being spent
+            </p>
+          </div>
 
-          <Search
-            size={19}
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-          />
+          {categoryTotals.length === 0 ? (
+            <div className="py-10 text-center text-sm text-slate-400">
+              No expense data available
+            </div>
+          ) : (
+            <div className="space-y-5">
 
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by category, description or date..."
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm outline-none transition focus:border-slate-400 focus:bg-white"
-          />
+              {categoryTotals.slice(0, 6).map((item) => {
+                const Icon =
+                  categoryIcons[item.category] || Receipt
 
+                const percentage =
+                  (item.amount / totalExpenses) * 100
+
+                return (
+                  <div key={item.category}>
+
+                    <div className="mb-2 flex items-center justify-between">
+
+                      <div className="flex items-center gap-3">
+
+                        <div className="rounded-lg bg-orange-50 p-2 text-orange-600">
+                          <Icon size={17} />
+                        </div>
+
+                        <span className="text-sm font-medium text-slate-700">
+                          {item.category}
+                        </span>
+
+                      </div>
+
+                      <span className="text-sm font-bold text-slate-800">
+                        ₹{item.amount.toLocaleString("en-IN")}
+                      </span>
+
+                    </div>
+
+                    <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-orange-400 to-red-500"
+                        style={{
+                          width: `${Math.max(
+                            (item.amount / maxCategoryAmount) * 100,
+                            4
+                          )}%`,
+                        }}
+                      />
+
+                    </div>
+
+                    <p className="mt-1 text-right text-xs text-slate-400">
+                      {percentage.toFixed(1)}%
+                    </p>
+
+                  </div>
+                )
+              })}
+
+            </div>
+          )}
         </div>
 
-      </div>
+        {/* RECENT SPENDING */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-3">
 
-
-      {/* ==========================================
-          TABLE
-      ========================================== */}
-
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-
-        <div className="border-b border-slate-200 px-6 py-5">
-
-          <div className="flex items-center justify-between">
+          <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
 
             <div>
-
               <h2 className="text-lg font-bold text-slate-900">
                 Expense Records
               </h2>
 
               <p className="mt-1 text-sm text-slate-500">
-                {filteredExpenses.length} record
-                {filteredExpenses.length !== 1 ? "s" : ""}
+                {filteredRecords.length} records found
               </p>
-
             </div>
 
-          </div>
+            <div className="relative w-full md:w-64">
 
-        </div>
+              <Search
+                size={18}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              />
 
-
-        {loading ? (
-
-          <div className="flex items-center justify-center py-20">
-
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-slate-900" />
-
-          </div>
-
-        ) : filteredExpenses.length === 0 ? (
-
-          <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
-
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100">
-
-              <Receipt
-                size={28}
-                className="text-slate-400"
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search expenses..."
+                className="w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
               />
 
             </div>
 
-            <h3 className="mt-5 text-lg font-semibold text-slate-900">
-              No expenses found
-            </h3>
-
-            <p className="mt-2 max-w-sm text-sm text-slate-500">
-
-              {search
-                ? "Try changing your search."
-                : "Start by adding your first farm expense."
-              }
-
-            </p>
-
-            {!search && (
-
-              <button
-                onClick={openAddModal}
-                className="mt-5 flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"
-              >
-
-                <Plus size={17} />
-
-                Add Expense
-
-              </button>
-
-            )}
-
           </div>
 
-        ) : (
+          {loading ? (
+            <div className="py-12 text-center text-slate-500">
+              Loading expenses...
+            </div>
+          ) : filteredRecords.length === 0 ? (
+            <div className="py-12 text-center">
 
-          <div className="overflow-x-auto">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-orange-50 text-orange-500">
+                <Wallet size={25} />
+              </div>
 
-            <table className="w-full min-w-[800px]">
+              <p className="mt-4 font-semibold text-slate-700">
+                No expenses found
+              </p>
 
-              <thead>
+              <p className="mt-1 text-sm text-slate-400">
+                Add an expense or change the selected period.
+              </p>
 
-                <tr className="border-b border-slate-200 bg-slate-50">
+            </div>
+          ) : (
+            <div className="space-y-3">
 
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Date
-                  </th>
+              {filteredRecords.map((record) => {
+                const Icon =
+                  categoryIcons[record.category] || Receipt
 
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Category
-                  </th>
-
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Description
-                  </th>
-
-                  <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Amount
-                  </th>
-
-                  <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Actions
-                  </th>
-
-                </tr>
-
-              </thead>
-
-
-              <tbody>
-
-                {filteredExpenses.map((expense) => (
-
-                  <tr
-                    key={expense.expense_id}
-                    className="border-b border-slate-100 transition hover:bg-slate-50"
+                return (
+                  <div
+                    key={record.expense_id}
+                    className="flex flex-col gap-4 rounded-xl border border-slate-100 p-4 transition hover:border-orange-200 hover:bg-orange-50/30 md:flex-row md:items-center"
                   >
 
-                    <td className="px-6 py-4">
+                    <div className="flex min-w-0 flex-1 items-center gap-4">
 
-                      <div className="flex items-center gap-3">
+                      <div className="rounded-xl bg-orange-50 p-3 text-orange-600">
+                        <Icon size={20} />
+                      </div>
 
-                        <CalendarDays
-                          size={17}
-                          className="text-slate-400"
-                        />
+                      <div className="min-w-0">
 
-                        <span className="text-sm font-medium text-slate-700">
-                          {expense.expense_date}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-2">
+
+                          <h3 className="font-semibold text-slate-800">
+                            {record.category}
+                          </h3>
+
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
+                            {record.expense_date}
+                          </span>
+
+                        </div>
+
+                        <p className="mt-1 truncate text-sm text-slate-500">
+                          {record.description || "No description"}
+                        </p>
 
                       </div>
 
-                    </td>
+                    </div>
 
+                    <div className="flex items-center justify-between gap-4 md:justify-end">
 
-                    <td className="px-6 py-4">
-
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700">
-
-                        <Tag size={13} />
-
-                        {expense.category}
-
+                      <span className="text-lg font-bold text-red-600">
+                        - ₹{Number(record.amount).toLocaleString("en-IN")}
                       </span>
 
-                    </td>
-
-
-                    <td className="px-6 py-4">
-
-                      <div className="flex items-center gap-2">
-
-                        <FileText
-                          size={16}
-                          className="text-slate-400"
-                        />
-
-                        <span className="max-w-[300px] truncate text-sm text-slate-600">
-
-                          {expense.description || "—"}
-
-                        </span>
-
-                      </div>
-
-                    </td>
-
-
-                    <td className="px-6 py-4 text-right">
-
-                      <span className="text-sm font-bold text-red-600">
-
-                        ₹{formatCurrency(expense.amount)}
-
-                      </span>
-
-                    </td>
-
-
-                    <td className="px-6 py-4">
-
-                      <div className="flex justify-end gap-2">
+                      <div className="flex gap-1">
 
                         <button
-                          onClick={() =>
-                            openEditModal(expense)
-                          }
-                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600"
-                          title="Edit"
+                          onClick={() => openEditModal(record)}
+                          className="rounded-lg p-2 text-blue-600 hover:bg-blue-50"
                         >
-
-                          <Pencil size={16} />
-
+                          <Pencil size={17} />
                         </button>
 
-
                         <button
-                          onClick={() =>
-                            handleDelete(
-                              expense.expense_id
-                            )
-                          }
-                          disabled={
-                            deletingId ===
-                            expense.expense_id
-                          }
-                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
-                          title="Delete"
+                          onClick={() => setDeleteId(record.expense_id)}
+                          className="rounded-lg p-2 text-red-600 hover:bg-red-50"
                         >
-
-                          {deletingId ===
-                          expense.expense_id ? (
-
-                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-red-600" />
-
-                          ) : (
-
-                            <Trash2 size={16} />
-
-                          )}
-
+                          <Trash2 size={17} />
                         </button>
 
                       </div>
 
-                    </td>
+                    </div>
 
-                  </tr>
+                  </div>
+                )
+              })}
 
-                ))}
+            </div>
+          )}
 
-              </tbody>
-
-            </table>
-
-          </div>
-
-        )}
-
+        </div>
       </div>
 
-
-      {/* ==========================================
-          ADD / EDIT MODAL
-      ========================================== */}
-
+      {/* ADD / EDIT MODAL */}
       {showModal && (
-
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
 
           <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
 
-
-            {/* MODAL HEADER */}
-
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
+            <div className="flex items-center justify-between border-b border-slate-200 p-5">
 
               <div>
-
-                <h2 className="text-xl font-bold text-slate-900">
-
-                  {editingExpense
+                <h2 className="text-lg font-bold text-slate-900">
+                  {editingRecord
                     ? "Edit Expense"
-                    : "Add Expense"
-                  }
-
+                    : "Add Expense"}
                 </h2>
 
-                <p className="mt-1 text-sm text-slate-500">
-
-                  {editingExpense
-                    ? "Update expense details"
-                    : "Enter the expense details"
-                  }
-
+                <p className="text-sm text-slate-500">
+                  Record your farm spending
                 </p>
-
               </div>
-
 
               <button
                 onClick={closeModal}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"
               >
-
                 <X size={20} />
-
               </button>
 
             </div>
 
-
-            {/* FORM */}
-
             <form
               onSubmit={handleSubmit}
-              className="space-y-5 p-6"
+              className="space-y-5 p-5"
             >
 
-
-              {/* DATE */}
-
               <div>
-
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
-
+                <label className="mb-2 block text-sm font-medium text-slate-700">
                   Expense Date
-
                 </label>
 
                 <input
@@ -916,55 +679,32 @@ function Expenses() {
                   name="expense_date"
                   value={form.expense_date}
                   onChange={handleChange}
-                  required
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-slate-400"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
                 />
-
               </div>
 
-
-              {/* CATEGORY */}
-
               <div>
-
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
-
+                <label className="mb-2 block text-sm font-medium text-slate-700">
                   Category
-
                 </label>
 
                 <select
                   name="category"
                   value={form.category}
                   onChange={handleChange}
-                  required
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-400"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
                 >
-
                   {categories.map((category) => (
-
-                    <option
-                      key={category}
-                      value={category}
-                    >
+                    <option key={category}>
                       {category}
                     </option>
-
                   ))}
-
                 </select>
-
               </div>
 
-
-              {/* DESCRIPTION */}
-
               <div>
-
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
-
+                <label className="mb-2 block text-sm font-medium text-slate-700">
                   Description
-
                 </label>
 
                 <input
@@ -973,89 +713,102 @@ function Expenses() {
                   value={form.description}
                   onChange={handleChange}
                   placeholder="Example: Cattle feed purchase"
-                  maxLength={255}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-slate-400"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
                 />
-
               </div>
 
-
-              {/* AMOUNT */}
-
               <div>
-
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
-
+                <label className="mb-2 block text-sm font-medium text-slate-700">
                   Amount
-
                 </label>
 
                 <div className="relative">
-
                   <IndianRupee
                     size={17}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
                   />
 
                   <input
                     type="number"
+                    min="0"
+                    step="0.01"
                     name="amount"
                     value={form.amount}
                     onChange={handleChange}
                     placeholder="0.00"
-                    min="0.01"
-                    step="0.01"
-                    required
-                    className="w-full rounded-xl border border-slate-200 py-3 pl-11 pr-4 text-sm outline-none focus:border-slate-400"
+                    className="w-full rounded-xl border border-slate-200 py-3 pl-10 pr-4 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
                   />
-
                 </div>
-
               </div>
-
-
-              {/* BUTTONS */}
 
               <div className="flex gap-3 pt-2">
 
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  className="flex-1 rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-600 hover:bg-slate-50"
                 >
-
                   Cancel
-
                 </button>
-
 
                 <button
                   type="submit"
-                  className="flex-1 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+                  className="flex-1 rounded-xl bg-orange-500 px-4 py-3 font-semibold text-white hover:bg-orange-600"
                 >
-
-                  {editingExpense
+                  {editingRecord
                     ? "Update Expense"
-                    : "Add Expense"
-                  }
-
+                    : "Save Expense"}
                 </button>
 
               </div>
 
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE MODAL */}
+      {deleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-600">
+              <Trash2 size={24} />
+            </div>
+
+            <h2 className="mt-4 text-center text-lg font-bold text-slate-900">
+              Delete Expense?
+            </h2>
+
+            <p className="mt-2 text-center text-sm text-slate-500">
+              This expense will be permanently deleted.
+            </p>
+
+            <div className="mt-6 flex gap-3">
+
+              <button
+                onClick={() => setDeleteId(null)}
+                className="flex-1 rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-600"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleDelete}
+                className="flex-1 rounded-xl bg-red-600 px-4 py-3 font-semibold text-white hover:bg-red-700"
+              >
+                Delete
+              </button>
+
+            </div>
 
           </div>
-
         </div>
-
       )}
 
     </div>
-
   )
-
 }
-
 
 export default Expenses

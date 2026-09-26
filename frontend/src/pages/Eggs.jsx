@@ -13,12 +13,17 @@ import {
 } from "lucide-react"
 
 const API_URL = "http://127.0.0.1:5000"
-const [dateFilter, setDateFilter] = useState("7days")
 
 function Eggs() {
+  // =========================
+  // STATE
+  // =========================
+
   const [records, setRecords] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
+  const [dateFilter, setDateFilter] = useState("7days")
+
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [deleteId, setDeleteId] = useState(null)
@@ -28,6 +33,10 @@ function Eggs() {
     quantity: "",
     rate: "",
   })
+
+  // =========================
+  // FETCH EGGS
+  // =========================
 
   const fetchEggs = async () => {
     try {
@@ -50,51 +59,139 @@ function Eggs() {
     fetchEggs()
   }, [])
 
-  const filteredRecords = useMemo(() => {
-    return records.filter((record) =>
-      record.record_date?.toLowerCase().includes(search.toLowerCase())
-    )
-  }, [records, search])
+  // =========================
+  // DATE FILTER
+  // =========================
 
-  const totalEggs = records.reduce(
-    (sum, record) => sum + Number(record.quantity || 0),
+  const getStartDate = () => {
+    const today = new Date()
+    const start = new Date(today)
+
+    if (dateFilter === "7days") {
+      start.setDate(today.getDate() - 6)
+    }
+
+    if (dateFilter === "1month") {
+      start.setMonth(today.getMonth() - 1)
+    }
+
+    if (dateFilter === "6months") {
+      start.setMonth(today.getMonth() - 6)
+    }
+
+    if (dateFilter === "1year") {
+      start.setFullYear(today.getFullYear() - 1)
+    }
+
+    start.setHours(0, 0, 0, 0)
+
+    return start
+  }
+
+  // =========================
+  // FILTERED RECORDS
+  // =========================
+
+  const filteredRecords = useMemo(() => {
+    let result = [...records]
+
+    if (dateFilter !== "all") {
+      const startDate = getStartDate()
+
+      const endDate = new Date()
+      endDate.setHours(23, 59, 59, 999)
+
+      result = result.filter((record) => {
+        const recordDate = new Date(record.record_date)
+
+        return (
+          recordDate >= startDate &&
+          recordDate <= endDate
+        )
+      })
+    }
+
+    if (search.trim()) {
+      const searchValue = search.toLowerCase()
+
+      result = result.filter((record) =>
+        record.record_date
+          ?.toLowerCase()
+          .includes(searchValue)
+      )
+    }
+
+    return result
+  }, [records, dateFilter, search])
+
+  // =========================
+  // STATISTICS
+  // =========================
+
+  const totalEggs = filteredRecords.reduce(
+    (sum, record) =>
+      sum + Number(record.quantity || 0),
     0
   )
 
-  const totalRevenue = records.reduce(
-    (sum, record) => sum + Number(record.total || 0),
+  const totalRevenue = filteredRecords.reduce(
+    (sum, record) =>
+      sum + Number(record.total || 0),
     0
   )
 
   const averageRate =
-    totalEggs > 0 ? totalRevenue / totalEggs : 0
+    totalEggs > 0
+      ? totalRevenue / totalEggs
+      : 0
 
-  const today = new Date().toISOString().split("T")[0]
+  // =========================
+  // TODAY
+  // =========================
+
+  const today =
+    new Date().toISOString().split("T")[0]
 
   const todayRecords = records.filter(
     (record) => record.record_date === today
   )
 
   const todayEggs = todayRecords.reduce(
-    (sum, record) => sum + Number(record.quantity || 0),
+    (sum, record) =>
+      sum + Number(record.quantity || 0),
     0
   )
 
   const todayRevenue = todayRecords.reduce(
-    (sum, record) => sum + Number(record.total || 0),
+    (sum, record) =>
+      sum + Number(record.total || 0),
     0
   )
 
+  // =========================
+  // MAX PRODUCTION
+  // =========================
+
   const maxDailyQuantity = Math.max(
-    ...records.map((record) => Number(record.quantity || 0)),
+    ...filteredRecords.map((record) =>
+      Number(record.quantity || 0)
+    ),
     1
   )
+
+  // =========================
+  // FORMAT CURRENCY
+  // =========================
 
   const formatCurrency = (amount) =>
     Number(amount || 0).toLocaleString("en-IN", {
       minimumFractionDigits: 0,
       maximumFractionDigits: 2,
     })
+
+  // =========================
+  // ADD MODAL
+  // =========================
 
   const openAddModal = () => {
     setEditingId(null)
@@ -108,6 +205,10 @@ function Eggs() {
     setShowModal(true)
   }
 
+  // =========================
+  // EDIT MODAL
+  // =========================
+
   const openEditModal = (record) => {
     setEditingId(record.egg_id)
 
@@ -120,15 +221,27 @@ function Eggs() {
     setShowModal(true)
   }
 
+  // =========================
+  // CLOSE MODAL
+  // =========================
+
   const closeModal = () => {
     setShowModal(false)
     setEditingId(null)
   }
 
+  // =========================
+  // SUBMIT
+  // =========================
+
   const handleSubmit = async (e) => {
     e.preventDefault()
 
-    if (!form.record_date || !form.quantity || !form.rate) {
+    if (
+      !form.record_date ||
+      !form.quantity ||
+      !form.rate
+    ) {
       alert("Please fill all fields")
       return
     }
@@ -155,7 +268,7 @@ function Eggs() {
       const data = await response.json()
 
       if (!data.success) {
-        alert(data.error || "Something went wrong")
+        alert(data.error || data.message || "Something went wrong")
         return
       }
 
@@ -166,6 +279,10 @@ function Eggs() {
       alert("Unable to connect to server")
     }
   }
+
+  // =========================
+  // DELETE
+  // =========================
 
   const handleDelete = async () => {
     if (!deleteId) return
@@ -181,7 +298,7 @@ function Eggs() {
       const data = await response.json()
 
       if (!data.success) {
-        alert(data.error || "Delete failed")
+        alert(data.error || data.message || "Delete failed")
         return
       }
 
@@ -193,8 +310,17 @@ function Eggs() {
     }
   }
 
+  // =========================
+  // LIVE TOTAL
+  // =========================
+
   const liveTotal =
-    Number(form.quantity || 0) * Number(form.rate || 0)
+    Number(form.quantity || 0) *
+    Number(form.rate || 0)
+
+  // =========================
+  // RETURN
+  // =========================
 
   return (
     <div className="space-y-7">
@@ -227,7 +353,46 @@ function Eggs() {
 
       </div>
 
-      {/* EGG HERO */}
+      {/* DATE FILTER */}
+      <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+
+        <div className="flex items-center gap-2">
+          <CalendarDays
+            size={19}
+            className="text-orange-500"
+          />
+
+          <span className="text-sm font-semibold text-slate-700">
+            Production Period
+          </span>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+
+          {[
+            ["7days", "Past 7 Days"],
+            ["1month", "1 Month"],
+            ["6months", "6 Months"],
+            ["1year", "1 Year"],
+            ["all", "All Time"],
+          ].map(([value, label]) => (
+            <button
+              key={value}
+              onClick={() => setDateFilter(value)}
+              className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                dateFilter === value
+                  ? "bg-orange-500 text-white shadow-sm"
+                  : "bg-slate-50 text-slate-600 hover:bg-orange-50 hover:text-orange-600"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+
+        </div>
+      </div>
+
+      {/* HERO */}
       <div className="rounded-3xl border border-orange-100 bg-white p-7 shadow-sm">
 
         <div className="flex flex-col gap-7 lg:flex-row lg:items-center">
@@ -239,6 +404,7 @@ function Eggs() {
             </div>
 
             <div>
+
               <p className="text-sm font-medium text-slate-500">
                 Total Eggs Produced
               </p>
@@ -248,8 +414,9 @@ function Eggs() {
               </h2>
 
               <p className="mt-2 text-sm text-slate-400">
-                Across {records.length} production records
+                {filteredRecords.length} production records
               </p>
+
             </div>
 
           </div>
@@ -257,6 +424,7 @@ function Eggs() {
           <div className="grid grid-cols-2 gap-3 lg:w-[420px]">
 
             <div className="rounded-2xl bg-orange-50 p-4">
+
               <div className="flex items-center gap-2 text-orange-600">
                 <Hash size={17} />
                 <span className="text-xs font-semibold">
@@ -267,9 +435,11 @@ function Eggs() {
               <p className="mt-2 text-2xl font-bold text-slate-900">
                 {todayEggs.toLocaleString("en-IN")}
               </p>
+
             </div>
 
             <div className="rounded-2xl bg-green-50 p-4">
+
               <div className="flex items-center gap-2 text-green-600">
                 <IndianRupee size={17} />
                 <span className="text-xs font-semibold">
@@ -280,6 +450,7 @@ function Eggs() {
               <p className="mt-2 text-2xl font-bold text-slate-900">
                 ₹{formatCurrency(totalRevenue)}
               </p>
+
             </div>
 
           </div>
@@ -288,10 +459,11 @@ function Eggs() {
 
       </div>
 
-      {/* EGG STAT CARDS */}
+      {/* STAT CARDS */}
       <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
 
         <div className="rounded-2xl border border-orange-100 bg-gradient-to-br from-orange-50 to-white p-5">
+
           <div className="flex items-center justify-between">
 
             <div>
@@ -313,9 +485,11 @@ function Eggs() {
           <p className="mt-3 text-xs text-slate-400">
             ₹{formatCurrency(todayRevenue)} earned today
           </p>
+
         </div>
 
         <div className="rounded-2xl border border-purple-100 bg-gradient-to-br from-purple-50 to-white p-5">
+
           <div className="flex items-center justify-between">
 
             <div>
@@ -337,9 +511,11 @@ function Eggs() {
           <p className="mt-3 text-xs text-slate-400">
             Average earning per egg
           </p>
+
         </div>
 
         <div className="rounded-2xl border border-green-100 bg-gradient-to-br from-green-50 to-white p-5">
+
           <div className="flex items-center justify-between">
 
             <div>
@@ -359,8 +535,9 @@ function Eggs() {
           </div>
 
           <p className="mt-3 text-xs text-slate-400">
-            From all egg production
+            Selected period
           </p>
+
         </div>
 
       </div>
@@ -369,23 +546,28 @@ function Eggs() {
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
 
         <div className="mb-6">
+
           <h2 className="text-lg font-bold text-slate-900">
             Production Activity
           </h2>
 
           <p className="mt-1 text-sm text-slate-500">
-            Egg production across recent records
+            Egg production for the selected period
           </p>
+
         </div>
 
-        {records.length === 0 ? (
+        {filteredRecords.length === 0 ? (
+
           <div className="py-10 text-center text-sm text-slate-400">
             No production activity available
           </div>
+
         ) : (
+
           <div className="space-y-4">
 
-            {[...records]
+            {[...filteredRecords]
               .sort(
                 (a, b) =>
                   new Date(b.record_date) -
@@ -394,7 +576,8 @@ function Eggs() {
               .slice(0, 6)
               .map((record) => {
 
-                const quantity = Number(record.quantity || 0)
+                const quantity =
+                  Number(record.quantity || 0)
 
                 const width =
                   (quantity / maxDailyQuantity) * 100
@@ -405,6 +588,7 @@ function Eggs() {
                     <div className="mb-2 flex items-center justify-between">
 
                       <div className="flex items-center gap-3">
+
                         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-50 text-orange-500">
                           <EggIcon size={16} />
                         </span>
@@ -412,6 +596,7 @@ function Eggs() {
                         <span className="text-sm font-medium text-slate-700">
                           {record.record_date}
                         </span>
+
                       </div>
 
                       <span className="text-sm font-bold text-slate-800">
@@ -421,12 +606,14 @@ function Eggs() {
                     </div>
 
                     <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+
                       <div
                         className="h-full rounded-full bg-orange-400 transition-all"
                         style={{
                           width: `${width}%`,
                         }}
                       />
+
                     </div>
 
                   </div>
@@ -434,6 +621,7 @@ function Eggs() {
               })}
 
           </div>
+
         )}
 
       </div>
@@ -444,13 +632,15 @@ function Eggs() {
         <div className="flex flex-col gap-4 border-b border-slate-100 p-6 md:flex-row md:items-center md:justify-between">
 
           <div>
+
             <h2 className="text-lg font-bold text-slate-900">
               Egg Production Records
             </h2>
 
             <p className="mt-1 text-sm text-slate-500">
-              Complete production history
+              {filteredRecords.length} records found
             </p>
+
           </div>
 
           <div className="relative w-full md:w-72">
@@ -473,10 +663,13 @@ function Eggs() {
         </div>
 
         {loading ? (
+
           <div className="p-12 text-center text-sm text-slate-400">
             Loading egg records...
           </div>
+
         ) : filteredRecords.length === 0 ? (
+
           <div className="p-12 text-center">
 
             <EggIcon
@@ -496,7 +689,9 @@ function Eggs() {
             </button>
 
           </div>
+
         ) : (
+
           <div className="overflow-x-auto">
 
             <table className="w-full text-left">
@@ -504,6 +699,7 @@ function Eggs() {
               <thead className="bg-slate-50">
 
                 <tr>
+
                   <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
                     Date
                   </th>
@@ -523,6 +719,7 @@ function Eggs() {
                   <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">
                     Actions
                   </th>
+
                 </tr>
 
               </thead>
@@ -554,7 +751,7 @@ function Eggs() {
                     <td className="px-6 py-4">
 
                       <span className="rounded-lg bg-orange-50 px-3 py-1.5 text-sm font-semibold text-orange-700">
-                        {record.quantity.toLocaleString("en-IN")} eggs
+                        {Number(record.quantity).toLocaleString("en-IN")} eggs
                       </span>
 
                     </td>
@@ -598,11 +795,12 @@ function Eggs() {
             </table>
 
           </div>
+
         )}
 
       </div>
 
-      {/* MODAL */}
+      {/* ADD / EDIT MODAL */}
       {showModal && (
 
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
@@ -612,13 +810,17 @@ function Eggs() {
             <div className="flex items-center justify-between border-b border-slate-100 p-6">
 
               <div>
+
                 <h2 className="text-lg font-bold text-slate-900">
-                  {editingId ? "Edit Egg Record" : "Add Egg Record"}
+                  {editingId
+                    ? "Edit Egg Record"
+                    : "Add Egg Record"}
                 </h2>
 
                 <p className="mt-1 text-xs text-slate-400">
                   Enter egg production details
                 </p>
+
               </div>
 
               <button
@@ -636,6 +838,7 @@ function Eggs() {
             >
 
               <div>
+
                 <label className="mb-2 block text-sm font-medium text-slate-700">
                   Date
                 </label>
@@ -651,9 +854,11 @@ function Eggs() {
                   }
                   className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                 />
+
               </div>
 
               <div>
+
                 <label className="mb-2 block text-sm font-medium text-slate-700">
                   Number of Eggs
                 </label>
@@ -672,9 +877,11 @@ function Eggs() {
                   }
                   className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                 />
+
               </div>
 
               <div>
+
                 <label className="mb-2 block text-sm font-medium text-slate-700">
                   Rate per Egg
                 </label>
@@ -693,6 +900,7 @@ function Eggs() {
                   }
                   className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                 />
+
               </div>
 
               <div className="rounded-xl bg-orange-50 p-4">
@@ -721,7 +929,9 @@ function Eggs() {
                   type="submit"
                   className="flex-1 rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white hover:bg-orange-600"
                 >
-                  {editingId ? "Update Record" : "Save Record"}
+                  {editingId
+                    ? "Update Record"
+                    : "Save Record"}
                 </button>
 
               </div>
@@ -734,7 +944,7 @@ function Eggs() {
 
       )}
 
-      {/* DELETE */}
+      {/* DELETE MODAL */}
       {deleteId && (
 
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
@@ -781,4 +991,4 @@ function Eggs() {
   )
 }
 
-export default Eggs;
+export default Eggs
