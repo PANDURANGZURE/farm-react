@@ -28,10 +28,7 @@ const menuItems = [
     name: "Sales",
     icon: ShoppingCart,
   },
-  {
-    name: "Reports",
-    icon: BarChart3,
-  },
+ 
 ]
 
 function Sidebar({ activePage, setActivePage }) {

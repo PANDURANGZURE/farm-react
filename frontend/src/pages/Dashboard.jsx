@@ -1,337 +1,692 @@
+import { useEffect, useMemo, useState } from "react"
+
 import {
+  IndianRupee,
   Milk,
   Egg,
+  ShoppingCart,
   Wallet,
   TrendingUp,
-  ArrowUpRight,
-  ArrowDownRight,
+  TrendingDown,
+  RefreshCw,
 } from "lucide-react"
 
-import StatCard from "../Components/StatCard"
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+} from "recharts"
+
+
+const API_URL = "http://127.0.0.1:5000"
+
 
 function Dashboard() {
-  return (
-    <div>
 
-      {/* Page Header */}
-      <div className="mb-8 flex items-center justify-between">
+  const [milk, setMilk] = useState([])
+  const [eggs, setEggs] = useState([])
+  const [expenses, setExpenses] = useState([])
+  const [sales, setSales] = useState([])
+
+  const [loading, setLoading] = useState(true)
+
+
+  // ==========================================
+  // FETCH ALL DASHBOARD DATA
+  // ==========================================
+
+  const fetchDashboardData = async () => {
+
+    try {
+
+      setLoading(true)
+
+      const [
+        milkResponse,
+        eggsResponse,
+        expensesResponse,
+        salesResponse,
+      ] = await Promise.all([
+
+        fetch(`${API_URL}/api/milk`),
+
+        fetch(`${API_URL}/api/eggs`),
+
+        fetch(`${API_URL}/api/expenses`),
+
+        fetch(`${API_URL}/api/sales`),
+
+      ])
+
+
+      const [
+        milkData,
+        eggsData,
+        expensesData,
+        salesData,
+      ] = await Promise.all([
+
+        milkResponse.json(),
+
+        eggsResponse.json(),
+
+        expensesResponse.json(),
+
+        salesResponse.json(),
+
+      ])
+
+
+      if (milkData.success) {
+        setMilk(milkData.records)
+      }
+
+      if (eggsData.success) {
+        setEggs(eggsData.records)
+      }
+
+      if (expensesData.success) {
+        setExpenses(expensesData.records)
+      }
+
+      if (salesData.success) {
+        setSales(salesData.records)
+      }
+
+    } catch (error) {
+
+      console.error(
+        "Dashboard error:",
+        error
+      )
+
+    } finally {
+
+      setLoading(false)
+
+    }
+
+  }
+
+
+  useEffect(() => {
+
+    fetchDashboardData()
+
+  }, [])
+
+
+  // ==========================================
+  // CALCULATIONS
+  // ==========================================
+
+  const milkRevenue = useMemo(() => {
+
+    return milk.reduce(
+      (sum, record) =>
+        sum + Number(record.total || 0),
+      0
+    )
+
+  }, [milk])
+
+
+  const eggRevenue = useMemo(() => {
+
+    return eggs.reduce(
+      (sum, record) =>
+        sum + Number(record.total || 0),
+      0
+    )
+
+  }, [eggs])
+
+
+  const salesRevenue = useMemo(() => {
+
+    return sales.reduce(
+      (sum, record) =>
+        sum + Number(record.total || 0),
+      0
+    )
+
+  }, [sales])
+
+
+  const totalExpenses = useMemo(() => {
+
+    return expenses.reduce(
+      (sum, record) =>
+        sum + Number(record.amount || 0),
+      0
+    )
+
+  }, [expenses])
+
+
+  const totalRevenue =
+    milkRevenue +
+    eggRevenue +
+    salesRevenue
+
+
+  const netProfit =
+    totalRevenue -
+    totalExpenses
+
+
+  const totalMilk = useMemo(() => {
+
+    return milk.reduce(
+      (sum, record) =>
+        sum + Number(record.quantity || 0),
+      0
+    )
+
+  }, [milk])
+
+
+  const totalEggs = useMemo(() => {
+
+    return eggs.reduce(
+      (sum, record) =>
+        sum + Number(record.quantity || 0),
+      0
+    )
+
+  }, [eggs])
+
+
+  const formatCurrency = (amount) => {
+
+    return Number(amount || 0).toLocaleString(
+      "en-IN",
+      {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }
+    )
+
+  }
+
+
+  // ==========================================
+  // CHART DATA
+  // ==========================================
+
+  const chartData = [
+
+    {
+      name: "Milk",
+      Revenue: milkRevenue,
+    },
+
+    {
+      name: "Eggs",
+      Revenue: eggRevenue,
+    },
+
+    {
+      name: "Sales",
+      Revenue: salesRevenue,
+    },
+
+    {
+      name: "Expenses",
+      Revenue: totalExpenses,
+    },
+
+  ]
+
+
+  // ==========================================
+  // RECENT DATA
+  // ==========================================
+
+  const recentSales = [...sales]
+    .sort(
+      (a, b) =>
+        new Date(b.sale_date) -
+        new Date(a.sale_date)
+    )
+    .slice(0, 5)
+
+
+  const recentExpenses = [...expenses]
+    .sort(
+      (a, b) =>
+        new Date(b.expense_date) -
+        new Date(a.expense_date)
+    )
+    .slice(0, 5)
+
+
+  // ==========================================
+  // STAT CARD
+  // ==========================================
+
+  const StatCard = ({
+    title,
+    value,
+    icon,
+    iconBg,
+    iconColor,
+    subtitle,
+  }) => (
+
+    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+
+      <div className="flex items-start justify-between">
 
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">
-            Dashboard
-          </h1>
 
-          <p className="mt-1 text-sm text-slate-500">
-            Overview of your farm operations
+          <p className="text-sm font-medium text-slate-500">
+            {title}
           </p>
-        </div>
 
-        <button className="rounded-xl bg-green-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-green-600/20 transition hover:bg-green-700">
-          + Add Record
-        </button>
-
-      </div>
-
-      {/* Stats */}
-      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-
-        <StatCard
-          title="Milk Revenue"
-          value="₹45,200"
-          subtitle="Total recorded revenue"
-          icon={<Milk size={22} />}
-          iconBg="bg-green-100"
-          iconColor="text-green-600"
-        />
-
-        <StatCard
-          title="Egg Revenue"
-          value="₹32,850"
-          subtitle="Total recorded revenue"
-          icon={<Egg size={22} />}
-          iconBg="bg-yellow-100"
-          iconColor="text-yellow-600"
-        />
-
-        <StatCard
-          title="Total Expenses"
-          value="₹18,500"
-          subtitle="Farm operating expenses"
-          icon={<Wallet size={22} />}
-          iconBg="bg-red-100"
-          iconColor="text-red-600"
-        />
-
-        <StatCard
-          title="Net Profit"
-          value="₹59,550"
-          subtitle="Revenue minus expenses"
-          icon={<TrendingUp size={22} />}
-          iconBg="bg-blue-100"
-          iconColor="text-blue-600"
-        />
-
-      </div>
-
-      {/* Main Content */}
-      <div className="mt-6 grid gap-6 xl:grid-cols-3">
-
-        {/* Revenue Chart Placeholder */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm xl:col-span-2">
-
-          <div className="flex items-center justify-between">
-
-            <div>
-              <h2 className="font-semibold text-slate-900">
-                Revenue Overview
-              </h2>
-
-              <p className="mt-1 text-sm text-slate-400">
-                Monthly farm revenue
-              </p>
-            </div>
-
-            <select className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 outline-none">
-              <option>Last 6 Months</option>
-              <option>Last 12 Months</option>
-              <option>This Year</option>
-            </select>
-
-          </div>
-
-          <div className="mt-8 flex h-64 items-end gap-5 border-b border-slate-100 px-4">
-
-            {[45, 65, 50, 80, 62, 92, 72, 85, 68, 95, 78, 88].map(
-              (height, index) => (
-                <div
-                  key={index}
-                  className="group flex flex-1 flex-col items-center justify-end"
-                >
-                  <div
-                    style={{ height: `${height}%` }}
-                    className="w-full max-w-10 rounded-t-lg bg-green-500 transition hover:bg-green-600"
-                  />
-
-                  <span className="mt-3 text-xs text-slate-400">
-                    {[
-                      "Jan",
-                      "Feb",
-                      "Mar",
-                      "Apr",
-                      "May",
-                      "Jun",
-                      "Jul",
-                      "Aug",
-                      "Sep",
-                      "Oct",
-                      "Nov",
-                      "Dec",
-                    ][index]}
-                  </span>
-                </div>
-              )
-            )}
-
-          </div>
-
-        </div>
-
-        {/* Quick Summary */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-
-          <h2 className="font-semibold text-slate-900">
-            Farm Summary
+          <h2 className="mt-2 text-2xl font-bold text-slate-900">
+            {value}
           </h2>
 
-          <p className="mt-1 text-sm text-slate-400">
-            Current performance
-          </p>
+          {subtitle && (
 
-          <div className="mt-6 space-y-5">
-
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">
-                Milk Production
-              </span>
-
-              <span className="font-semibold text-slate-800">
-                1,250 L
-              </span>
-            </div>
-
-            <div className="h-2 rounded-full bg-slate-100">
-              <div className="h-2 w-[78%] rounded-full bg-green-500" />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">
-                Eggs Produced
-              </span>
-
-              <span className="font-semibold text-slate-800">
-                12,450
-              </span>
-            </div>
-
-            <div className="h-2 rounded-full bg-slate-100">
-              <div className="h-2 w-[65%] rounded-full bg-yellow-500" />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">
-                Expenses
-              </span>
-
-              <span className="font-semibold text-slate-800">
-                ₹18,500
-              </span>
-            </div>
-
-            <div className="h-2 rounded-full bg-slate-100">
-              <div className="h-2 w-[42%] rounded-full bg-red-500" />
-            </div>
-
-          </div>
-
-          <div className="mt-8 rounded-xl bg-green-50 p-4">
-
-            <div className="flex items-center gap-2 text-green-700">
-              <ArrowUpRight size={18} />
-
-              <span className="text-sm font-semibold">
-                Profit is increasing
-              </span>
-            </div>
-
-            <p className="mt-1 text-xs text-green-600">
-              Compared with the previous period
+            <p className="mt-2 text-xs text-slate-400">
+              {subtitle}
             </p>
 
-          </div>
+          )}
 
         </div>
 
-      </div>
+        <div
+          className={`flex h-11 w-11 items-center justify-center rounded-xl ${iconBg}`}
+        >
 
-      {/* Recent Activity */}
-      <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-
-        <div className="flex items-center justify-between">
-
-          <div>
-            <h2 className="font-semibold text-slate-900">
-              Recent Activity
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-400">
-              Latest farm records
-            </p>
-          </div>
-
-          <button className="text-sm font-medium text-green-600 hover:text-green-700">
-            View All
-          </button>
-
-        </div>
-
-        <div className="mt-6 overflow-x-auto">
-
-          <table className="w-full text-left">
-
-            <thead>
-              <tr className="border-b border-slate-100 text-xs uppercase text-slate-400">
-                <th className="pb-4">Type</th>
-                <th className="pb-4">Date</th>
-                <th className="pb-4">Description</th>
-                <th className="pb-4">Amount</th>
-                <th className="pb-4">Status</th>
-              </tr>
-            </thead>
-
-            <tbody className="text-sm">
-
-              <tr className="border-b border-slate-50">
-                <td className="py-4 font-medium text-slate-700">
-                  🥛 Milk
-                </td>
-
-                <td className="py-4 text-slate-500">
-                  Today
-                </td>
-
-                <td className="py-4 text-slate-500">
-                  Milk sale
-                </td>
-
-                <td className="py-4 font-semibold text-green-600">
-                  +₹4,500
-                </td>
-
-                <td className="py-4">
-                  <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
-                    Completed
-                  </span>
-                </td>
-              </tr>
-
-              <tr className="border-b border-slate-50">
-                <td className="py-4 font-medium text-slate-700">
-                  🥚 Eggs
-                </td>
-
-                <td className="py-4 text-slate-500">
-                  Yesterday
-                </td>
-
-                <td className="py-4 text-slate-500">
-                  Egg sale
-                </td>
-
-                <td className="py-4 font-semibold text-green-600">
-                  +₹2,800
-                </td>
-
-                <td className="py-4">
-                  <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
-                    Completed
-                  </span>
-                </td>
-              </tr>
-
-              <tr>
-                <td className="py-4 font-medium text-slate-700">
-                  💸 Expense
-                </td>
-
-                <td className="py-4 text-slate-500">
-                  Yesterday
-                </td>
-
-                <td className="py-4 text-slate-500">
-                  Animal feed
-                </td>
-
-                <td className="py-4 font-semibold text-red-500">
-                  -₹1,250
-                </td>
-
-                <td className="py-4">
-                  <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">
-                    Expense
-                  </span>
-                </td>
-              </tr>
-
-            </tbody>
-
-          </table>
+          <span className={iconColor}>
+            {icon}
+          </span>
 
         </div>
 
       </div>
 
     </div>
+
   )
+
+
+  return (
+
+    <div className="space-y-8">
+
+
+      {/* ==========================================
+          HEADER
+      ========================================== */}
+
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+
+        <div>
+
+          <h1 className="text-3xl font-bold text-slate-900">
+            Farm Dashboard
+          </h1>
+
+          <p className="mt-1 text-sm text-slate-500">
+            Overview of your farm business
+          </p>
+
+        </div>
+
+
+        <button
+          onClick={fetchDashboardData}
+          disabled={loading}
+          className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
+        >
+
+          <RefreshCw
+            size={17}
+            className={
+              loading
+                ? "animate-spin"
+                : ""
+            }
+          />
+
+          Refresh
+
+        </button>
+
+      </div>
+
+
+      {/* ==========================================
+          MAIN STATISTICS
+      ========================================== */}
+
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+
+
+        <StatCard
+          title="Total Revenue"
+          value={`₹${formatCurrency(totalRevenue)}`}
+          icon={<IndianRupee size={21} />}
+          iconBg="bg-emerald-100"
+          iconColor="text-emerald-600"
+          subtitle="Milk + Eggs + Sales"
+        />
+
+
+        <StatCard
+          title="Total Expenses"
+          value={`₹${formatCurrency(totalExpenses)}`}
+          icon={<Wallet size={21} />}
+          iconBg="bg-red-100"
+          iconColor="text-red-600"
+          subtitle={`${expenses.length} expense records`}
+        />
+
+
+        <StatCard
+          title="Net Profit"
+          value={`₹${formatCurrency(netProfit)}`}
+          icon={
+            netProfit >= 0
+              ? <TrendingUp size={21} />
+              : <TrendingDown size={21} />
+          }
+          iconBg={
+            netProfit >= 0
+              ? "bg-blue-100"
+              : "bg-orange-100"
+          }
+          iconColor={
+            netProfit >= 0
+              ? "text-blue-600"
+              : "text-orange-600"
+          }
+          subtitle="Revenue − Expenses"
+        />
+
+
+        <StatCard
+          title="Sales Records"
+          value={sales.length}
+          icon={<ShoppingCart size={21} />}
+          iconBg="bg-purple-100"
+          iconColor="text-purple-600"
+          subtitle="Total sales transactions"
+        />
+
+      </div>
+
+
+      {/* ==========================================
+          PRODUCTION STATISTICS
+      ========================================== */}
+
+      <div>
+
+        <h2 className="mb-4 text-lg font-bold text-slate-900">
+          Production Overview
+        </h2>
+
+
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+
+
+          <StatCard
+            title="Milk Produced"
+            value={`${totalMilk.toLocaleString("en-IN")} L`}
+            icon={<Milk size={21} />}
+            iconBg="bg-blue-100"
+            iconColor="text-blue-600"
+            subtitle={`${milk.length} records`}
+          />
+
+
+          <StatCard
+            title="Eggs Produced"
+            value={totalEggs.toLocaleString("en-IN")}
+            icon={<Egg size={21} />}
+            iconBg="bg-orange-100"
+            iconColor="text-orange-600"
+            subtitle={`${eggs.length} records`}
+          />
+
+
+          <StatCard
+            title="Product Sales"
+            value={`₹${formatCurrency(salesRevenue)}`}
+            icon={<ShoppingCart size={21} />}
+            iconBg="bg-emerald-100"
+            iconColor="text-emerald-600"
+            subtitle={`${sales.length} records`}
+          />
+
+        </div>
+
+      </div>
+
+
+      {/* ==========================================
+          CHART
+      ========================================== */}
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+
+        <div className="mb-6">
+
+          <h2 className="text-lg font-bold text-slate-900">
+            Revenue Overview
+          </h2>
+
+          <p className="mt-1 text-sm text-slate-500">
+            Revenue and expense comparison
+          </p>
+
+        </div>
+
+
+        <div className="h-[350px] w-full">
+
+          <ResponsiveContainer
+            width="100%"
+            height="100%"
+          >
+
+            <BarChart
+              data={chartData}
+              margin={{
+                top: 10,
+                right: 20,
+                left: 10,
+                bottom: 10,
+              }}
+            >
+
+              <CartesianGrid
+                strokeDasharray="3 3"
+              />
+
+              <XAxis
+                dataKey="name"
+              />
+
+              <YAxis />
+
+              <Tooltip
+                formatter={(value) =>
+                  `₹${formatCurrency(value)}`
+                }
+              />
+
+              <Legend />
+
+              <Bar
+                dataKey="Revenue"
+                name="Amount"
+                radius={[6, 6, 0, 0]}
+              />
+
+            </BarChart>
+
+          </ResponsiveContainer>
+
+        </div>
+
+      </div>
+
+
+      {/* ==========================================
+          RECENT TABLES
+      ========================================== */}
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+
+
+        {/* RECENT SALES */}
+
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+
+          <div className="border-b border-slate-200 px-6 py-5">
+
+            <h2 className="text-lg font-bold text-slate-900">
+              Recent Sales
+            </h2>
+
+            <p className="mt-1 text-sm text-slate-500">
+              Latest sales transactions
+            </p>
+
+          </div>
+
+
+          {recentSales.length === 0 ? (
+
+            <div className="px-6 py-12 text-center text-sm text-slate-500">
+              No sales records available
+            </div>
+
+          ) : (
+
+            <div className="divide-y divide-slate-100">
+
+              {recentSales.map((sale) => (
+
+                <div
+                  key={sale.sale_id}
+                  className="flex items-center justify-between px-6 py-4"
+                >
+
+                  <div>
+
+                    <p className="text-sm font-semibold text-slate-800">
+                      {sale.product}
+                    </p>
+
+                    <p className="mt-1 text-xs text-slate-400">
+                      {sale.sale_date} •{" "}
+                      {sale.quantity} units
+                    </p>
+
+                  </div>
+
+
+                  <p className="text-sm font-bold text-emerald-600">
+                    ₹{formatCurrency(sale.total)}
+                  </p>
+
+                </div>
+
+              ))}
+
+            </div>
+
+          )}
+
+        </div>
+
+
+        {/* RECENT EXPENSES */}
+
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+
+          <div className="border-b border-slate-200 px-6 py-5">
+
+            <h2 className="text-lg font-bold text-slate-900">
+              Recent Expenses
+            </h2>
+
+            <p className="mt-1 text-sm text-slate-500">
+              Latest farm expenses
+            </p>
+
+          </div>
+
+
+          {recentExpenses.length === 0 ? (
+
+            <div className="px-6 py-12 text-center text-sm text-slate-500">
+              No expense records available
+            </div>
+
+          ) : (
+
+            <div className="divide-y divide-slate-100">
+
+              {recentExpenses.map((expense) => (
+
+                <div
+                  key={expense.expense_id}
+                  className="flex items-center justify-between px-6 py-4"
+                >
+
+                  <div>
+
+                    <p className="text-sm font-semibold text-slate-800">
+                      {expense.category}
+                    </p>
+
+                    <p className="mt-1 text-xs text-slate-400">
+                      {expense.expense_date}
+                      {expense.description
+                        ? ` • ${expense.description}`
+                        : ""
+                      }
+                    </p>
+
+                  </div>
+
+
+                  <p className="text-sm font-bold text-red-600">
+                    ₹{formatCurrency(expense.amount)}
+                  </p>
+
+                </div>
+
+              ))}
+
+            </div>
+
+          )}
+
+        </div>
+
+      </div>
+
+
+    </div>
+
+  )
+
 }
+
 
 export default Dashboard
