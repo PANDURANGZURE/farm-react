@@ -7,6 +7,7 @@ import Dashboard from "./pages/Dashboard"
 import Milk from "./pages/Milk"
 import Eggs from "./pages/Eggs"
 import Expenses from "./pages/Expenses"
+import Sales from "./pages/Sales"
 
 
 function App() {
@@ -27,6 +28,9 @@ function App() {
 
       case "Expenses":
         return <Expenses />
+
+      case "Sales":
+  return <Sales />
 
       case "Dashboard":
       default:

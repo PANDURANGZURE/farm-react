@@ -34,6 +34,15 @@ from expense import (
     delete_expense
 )
 
+from sale import (
+    get_all_sales,
+    add_sale,
+    update_sale,
+    delete_sale
+)
+
+
+
 
 # ==========================================
 # FLASK APP
@@ -655,6 +664,220 @@ def remove_expense(expense_id):
             "error": str(e)
         }), 500
 
+# ==========================================
+# SALES
+# ==========================================
+
+@app.route("/api/sales", methods=["GET"])
+def get_sales():
+
+    try:
+
+        records = get_all_sales()
+
+        return jsonify({
+            "success": True,
+            "records": records
+        })
+
+    except Exception as e:
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/sales", methods=["POST"])
+def create_sale():
+
+    try:
+
+        data = request.get_json()
+
+        if not data:
+
+            return jsonify({
+                "success": False,
+                "error": "Request body is required"
+            }), 400
+
+
+        sale_date = data.get("sale_date")
+        product = data.get("product")
+        quantity = data.get("quantity")
+        rate = data.get("rate")
+
+
+        if (
+            not sale_date
+            or not product
+            or quantity is None
+            or rate is None
+        ):
+
+            return jsonify({
+                "success": False,
+                "error": "Date, product, quantity and rate are required"
+            }), 400
+
+
+        quantity = float(quantity)
+        rate = float(rate)
+
+
+        if quantity <= 0 or rate <= 0:
+
+            return jsonify({
+                "success": False,
+                "error": "Quantity and rate must be greater than 0"
+            }), 400
+
+
+        sale_id = add_sale(
+            sale_date,
+            product,
+            quantity,
+            rate
+        )
+
+
+        return jsonify({
+            "success": True,
+            "message": "Sale added successfully",
+            "sale_id": sale_id
+        }), 201
+
+
+    except ValueError:
+
+        return jsonify({
+            "success": False,
+            "error": "Quantity and rate must be valid numbers"
+        }), 400
+
+
+    except Exception as e:
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/sales/<int:sale_id>", methods=["PUT"])
+def edit_sale(sale_id):
+
+    try:
+
+        data = request.get_json()
+
+        if not data:
+
+            return jsonify({
+                "success": False,
+                "error": "Request body is required"
+            }), 400
+
+
+        sale_date = data.get("sale_date")
+        product = data.get("product")
+        quantity = data.get("quantity")
+        rate = data.get("rate")
+
+
+        if (
+            not sale_date
+            or not product
+            or quantity is None
+            or rate is None
+        ):
+
+            return jsonify({
+                "success": False,
+                "error": "Date, product, quantity and rate are required"
+            }), 400
+
+
+        quantity = float(quantity)
+        rate = float(rate)
+
+
+        if quantity <= 0 or rate <= 0:
+
+            return jsonify({
+                "success": False,
+                "error": "Quantity and rate must be greater than 0"
+            }), 400
+
+
+        affected_rows = update_sale(
+            sale_id,
+            sale_date,
+            product,
+            quantity,
+            rate
+        )
+
+
+        if affected_rows == 0:
+
+            return jsonify({
+                "success": False,
+                "error": "Sale record not found"
+            }), 404
+
+
+        return jsonify({
+            "success": True,
+            "message": "Sale updated successfully"
+        })
+
+
+    except ValueError:
+
+        return jsonify({
+            "success": False,
+            "error": "Quantity and rate must be valid numbers"
+        }), 400
+
+
+    except Exception as e:
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/sales/<int:sale_id>", methods=["DELETE"])
+def remove_sale(sale_id):
+
+    try:
+
+        affected_rows = delete_sale(sale_id)
+
+
+        if affected_rows == 0:
+
+            return jsonify({
+                "success": False,
+                "error": "Sale record not found"
+            }), 404
+
+
+        return jsonify({
+            "success": True,
+            "message": "Sale deleted successfully"
+        })
+
+
+    except Exception as e:
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
 
 # ==========================================================
 #                    RUN FLASK SERVER
