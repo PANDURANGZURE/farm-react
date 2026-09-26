@@ -1,7 +1,9 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
-from database import get_connection
+# ==========================================
+# MILK FUNCTIONS
+# ==========================================
 
 from milk import (
     get_all_milk,
@@ -10,6 +12,21 @@ from milk import (
     delete_milk
 )
 
+# ==========================================
+# EGG FUNCTIONS
+# ==========================================
+
+from egg import (
+    get_all_eggs,
+    add_egg,
+    update_egg,
+    delete_egg
+)
+
+
+# ==========================================
+# FLASK APP
+# ==========================================
 
 app = Flask(__name__)
 
@@ -17,52 +34,25 @@ CORS(app)
 
 
 # ==========================================
-# HOME
+# HOME / TEST ROUTE
 # ==========================================
 
-@app.route("/")
+@app.route("/", methods=["GET"])
 def home():
 
     return jsonify({
+        "success": True,
         "message": "Farm Management API is running"
     })
 
 
-# ==========================================
-# TEST DATABASE
-# ==========================================
-
-@app.route("/api/test-db")
-def test_database():
-
-    try:
-
-        connection = get_connection()
-
-        cursor = connection.cursor()
-
-        cursor.execute("SELECT DATABASE()")
-
-        database = cursor.fetchone()[0]
-
-        cursor.close()
-        connection.close()
-
-        return jsonify({
-            "success": True,
-            "database": database
-        })
-
-    except Exception as e:
-
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+# ==========================================================
+#                         MILK
+# ==========================================================
 
 
 # ==========================================
-# GET ALL MILK
+# GET ALL MILK RECORDS
 # ==========================================
 
 @app.route("/api/milk", methods=["GET"])
@@ -86,7 +76,7 @@ def get_milk():
 
 
 # ==========================================
-# ADD MILK
+# ADD MILK RECORD
 # ==========================================
 
 @app.route("/api/milk", methods=["POST"])
@@ -95,6 +85,13 @@ def create_milk():
     try:
 
         data = request.get_json()
+
+        if not data:
+
+            return jsonify({
+                "success": False,
+                "error": "Request body is required"
+            }), 400
 
         record_date = data.get("record_date")
         quantity = data.get("quantity")
@@ -129,6 +126,13 @@ def create_milk():
             "milk_id": milk_id
         }), 201
 
+    except ValueError:
+
+        return jsonify({
+            "success": False,
+            "error": "Quantity and rate must be valid numbers"
+        }), 400
+
     except Exception as e:
 
         return jsonify({
@@ -138,7 +142,7 @@ def create_milk():
 
 
 # ==========================================
-# UPDATE MILK
+# UPDATE MILK RECORD
 # ==========================================
 
 @app.route("/api/milk/<int:milk_id>", methods=["PUT"])
@@ -147,6 +151,13 @@ def edit_milk(milk_id):
     try:
 
         data = request.get_json()
+
+        if not data:
+
+            return jsonify({
+                "success": False,
+                "error": "Request body is required"
+            }), 400
 
         record_date = data.get("record_date")
         quantity = data.get("quantity")
@@ -188,6 +199,13 @@ def edit_milk(milk_id):
             "message": "Milk record updated successfully"
         })
 
+    except ValueError:
+
+        return jsonify({
+            "success": False,
+            "error": "Quantity and rate must be valid numbers"
+        }), 400
+
     except Exception as e:
 
         return jsonify({
@@ -197,7 +215,7 @@ def edit_milk(milk_id):
 
 
 # ==========================================
-# DELETE MILK
+# DELETE MILK RECORD
 # ==========================================
 
 @app.route("/api/milk/<int:milk_id>", methods=["DELETE"])
@@ -227,13 +245,213 @@ def remove_milk(milk_id):
         }), 500
 
 
+# ==========================================================
+#                         EGGS
+# ==========================================================
+
+
 # ==========================================
-# RUN SERVER
+# GET ALL EGG RECORDS
+# ==========================================
+
+@app.route("/api/eggs", methods=["GET"])
+def get_eggs():
+
+    try:
+
+        records = get_all_eggs()
+
+        return jsonify({
+            "success": True,
+            "records": records
+        })
+
+    except Exception as e:
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+# ==========================================
+# ADD EGG RECORD
+# ==========================================
+
+@app.route("/api/eggs", methods=["POST"])
+def create_egg():
+
+    try:
+
+        data = request.get_json()
+
+        if not data:
+
+            return jsonify({
+                "success": False,
+                "error": "Request body is required"
+            }), 400
+
+        record_date = data.get("record_date")
+        quantity = data.get("quantity")
+        rate = data.get("rate")
+
+        if not record_date or quantity is None or rate is None:
+
+            return jsonify({
+                "success": False,
+                "error": "Date, quantity and rate are required"
+            }), 400
+
+        quantity = int(quantity)
+        rate = float(rate)
+
+        if quantity <= 0 or rate <= 0:
+
+            return jsonify({
+                "success": False,
+                "error": "Quantity and rate must be greater than 0"
+            }), 400
+
+        egg_id = add_egg(
+            record_date,
+            quantity,
+            rate
+        )
+
+        return jsonify({
+            "success": True,
+            "message": "Egg record added successfully",
+            "egg_id": egg_id
+        }), 201
+
+    except ValueError:
+
+        return jsonify({
+            "success": False,
+            "error": "Quantity and rate must be valid numbers"
+        }), 400
+
+    except Exception as e:
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+# ==========================================
+# UPDATE EGG RECORD
+# ==========================================
+
+@app.route("/api/eggs/<int:egg_id>", methods=["PUT"])
+def edit_egg(egg_id):
+
+    try:
+
+        data = request.get_json()
+
+        if not data:
+
+            return jsonify({
+                "success": False,
+                "error": "Request body is required"
+            }), 400
+
+        record_date = data.get("record_date")
+        quantity = data.get("quantity")
+        rate = data.get("rate")
+
+        if not record_date or quantity is None or rate is None:
+
+            return jsonify({
+                "success": False,
+                "error": "Date, quantity and rate are required"
+            }), 400
+
+        quantity = int(quantity)
+        rate = float(rate)
+
+        if quantity <= 0 or rate <= 0:
+
+            return jsonify({
+                "success": False,
+                "error": "Quantity and rate must be greater than 0"
+            }), 400
+
+        affected_rows = update_egg(
+            egg_id,
+            record_date,
+            quantity,
+            rate
+        )
+
+        if affected_rows == 0:
+
+            return jsonify({
+                "success": False,
+                "error": "Egg record not found"
+            }), 404
+
+        return jsonify({
+            "success": True,
+            "message": "Egg record updated successfully"
+        })
+
+    except ValueError:
+
+        return jsonify({
+            "success": False,
+            "error": "Quantity and rate must be valid numbers"
+        }), 400
+
+    except Exception as e:
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+# ==========================================
+# DELETE EGG RECORD
+# ==========================================
+
+@app.route("/api/eggs/<int:egg_id>", methods=["DELETE"])
+def remove_egg(egg_id):
+
+    try:
+
+        affected_rows = delete_egg(egg_id)
+
+        if affected_rows == 0:
+
+            return jsonify({
+                "success": False,
+                "error": "Egg record not found"
+            }), 404
+
+        return jsonify({
+            "success": True,
+            "message": "Egg record deleted successfully"
+        })
+
+    except Exception as e:
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+# ==========================================
+# RUN FLASK SERVER
 # ==========================================
 
 if __name__ == "__main__":
 
     app.run(
-        debug=True,
-        port=5000
+        host="127.0.0.1",
+        port=5000,
+        debug=True
     )
