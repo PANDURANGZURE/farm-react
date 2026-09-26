@@ -1,119 +1,106 @@
-import { useEffect, useState } from "react"
-
+import { useEffect, useMemo, useState } from "react"
 import {
   Egg as EggIcon,
   Plus,
   Search,
-  X,
-  IndianRupee,
-  TrendingUp,
-  CalendarDays,
   Pencil,
   Trash2,
+  X,
+  CalendarDays,
+  IndianRupee,
+  Hash,
+  BarChart3,
 } from "lucide-react"
 
-import StatCard from "../Components/StatCard"
-
-
 const API_URL = "http://127.0.0.1:5000"
-
+const [dateFilter, setDateFilter] = useState("7days")
 
 function Eggs() {
-
   const [records, setRecords] = useState([])
-
   const [loading, setLoading] = useState(true)
-
   const [search, setSearch] = useState("")
-
   const [showModal, setShowModal] = useState(false)
-
-  const [saving, setSaving] = useState(false)
-
   const [editingId, setEditingId] = useState(null)
+  const [deleteId, setDeleteId] = useState(null)
 
   const [form, setForm] = useState({
-    record_date: "",
+    record_date: new Date().toISOString().split("T")[0],
     quantity: "",
     rate: "",
   })
 
-
-  // ==========================================
-  // LOAD RECORDS
-  // ==========================================
-
-  const loadRecords = async () => {
-
+  const fetchEggs = async () => {
     try {
-
       setLoading(true)
 
-      const response = await fetch(
-        `${API_URL}/api/eggs`
-      )
-
+      const response = await fetch(`${API_URL}/api/eggs`)
       const data = await response.json()
 
       if (data.success) {
-
-        setRecords(data.records)
-
-      } else {
-
-        alert(
-          data.error ||
-          "Failed to load egg records"
-        )
-
+        setRecords(data.records || [])
       }
-
     } catch (error) {
-
-      console.error(error)
-
-      alert("Unable to connect to backend")
-
+      console.error("Egg fetch error:", error)
     } finally {
-
       setLoading(false)
-
     }
   }
 
-
   useEffect(() => {
-
-    loadRecords()
-
+    fetchEggs()
   }, [])
 
+  const filteredRecords = useMemo(() => {
+    return records.filter((record) =>
+      record.record_date?.toLowerCase().includes(search.toLowerCase())
+    )
+  }, [records, search])
 
-  // ==========================================
-  // FORM CHANGE
-  // ==========================================
+  const totalEggs = records.reduce(
+    (sum, record) => sum + Number(record.quantity || 0),
+    0
+  )
 
-  const handleChange = (e) => {
+  const totalRevenue = records.reduce(
+    (sum, record) => sum + Number(record.total || 0),
+    0
+  )
 
-    const { name, value } = e.target
+  const averageRate =
+    totalEggs > 0 ? totalRevenue / totalEggs : 0
 
-    setForm((previous) => ({
-      ...previous,
-      [name]: value,
-    }))
-  }
+  const today = new Date().toISOString().split("T")[0]
 
+  const todayRecords = records.filter(
+    (record) => record.record_date === today
+  )
 
-  // ==========================================
-  // OPEN ADD MODAL
-  // ==========================================
+  const todayEggs = todayRecords.reduce(
+    (sum, record) => sum + Number(record.quantity || 0),
+    0
+  )
+
+  const todayRevenue = todayRecords.reduce(
+    (sum, record) => sum + Number(record.total || 0),
+    0
+  )
+
+  const maxDailyQuantity = Math.max(
+    ...records.map((record) => Number(record.quantity || 0)),
+    1
+  )
+
+  const formatCurrency = (amount) =>
+    Number(amount || 0).toLocaleString("en-IN", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    })
 
   const openAddModal = () => {
-
     setEditingId(null)
 
     setForm({
-      record_date: "",
+      record_date: today,
       quantity: "",
       rate: "",
     })
@@ -121,13 +108,7 @@ function Eggs() {
     setShowModal(true)
   }
 
-
-  // ==========================================
-  // OPEN EDIT MODAL
-  // ==========================================
-
   const openEditModal = (record) => {
-
     setEditingId(record.egg_id)
 
     setForm({
@@ -139,314 +120,338 @@ function Eggs() {
     setShowModal(true)
   }
 
-
-  // ==========================================
-  // CLOSE MODAL
-  // ==========================================
-
   const closeModal = () => {
+    setShowModal(false)
+    setEditingId(null)
+  }
 
-    if (saving) {
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+
+    if (!form.record_date || !form.quantity || !form.rate) {
+      alert("Please fill all fields")
       return
     }
 
-    setShowModal(false)
-
-    setEditingId(null)
-
-    setForm({
-      record_date: "",
-      quantity: "",
-      rate: "",
-    })
-  }
-
-
-  // ==========================================
-  // ADD / UPDATE
-  // ==========================================
-
-  const handleSubmit = async (e) => {
-
-    e.preventDefault()
-
     try {
-
-      setSaving(true)
-
       const url = editingId
         ? `${API_URL}/api/eggs/${editingId}`
         : `${API_URL}/api/eggs`
 
-      const method = editingId
-        ? "PUT"
-        : "POST"
+      const method = editingId ? "PUT" : "POST"
 
-
-      const response = await fetch(
-        url,
-        {
-          method,
-
-          headers: {
-            "Content-Type": "application/json",
-          },
-
-          body: JSON.stringify({
-            record_date: form.record_date,
-            quantity: Number(form.quantity),
-            rate: Number(form.rate),
-          }),
-        }
-      )
-
+      const response = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          record_date: form.record_date,
+          quantity: Number(form.quantity),
+          rate: Number(form.rate),
+        }),
+      })
 
       const data = await response.json()
 
-
-      if (!response.ok) {
-
-        alert(
-          data.error ||
-          "Operation failed"
-        )
-
+      if (!data.success) {
+        alert(data.error || "Something went wrong")
         return
       }
 
-
-      alert(
-        editingId
-          ? "Egg record updated successfully"
-          : "Egg record added successfully"
-      )
-
-
       closeModal()
-
-      await loadRecords()
-
-
+      fetchEggs()
     } catch (error) {
-
       console.error(error)
-
-      alert("Unable to connect to backend")
-
-    } finally {
-
-      setSaving(false)
-
+      alert("Unable to connect to server")
     }
   }
 
-
-  // ==========================================
-  // DELETE
-  // ==========================================
-
-  const handleDelete = async (eggId) => {
-
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this egg record?"
-    )
-
-
-    if (!confirmed) {
-      return
-    }
-
+  const handleDelete = async () => {
+    if (!deleteId) return
 
     try {
-
       const response = await fetch(
-        `${API_URL}/api/eggs/${eggId}`,
+        `${API_URL}/api/eggs/${deleteId}`,
         {
           method: "DELETE",
         }
       )
 
-
       const data = await response.json()
 
-
-      if (!response.ok) {
-
-        alert(
-          data.error ||
-          "Failed to delete record"
-        )
-
+      if (!data.success) {
+        alert(data.error || "Delete failed")
         return
       }
 
-
-      alert(
-        "Egg record deleted successfully"
-      )
-
-
-      await loadRecords()
-
-
+      setDeleteId(null)
+      fetchEggs()
     } catch (error) {
-
       console.error(error)
-
-      alert("Unable to connect to backend")
-
+      alert("Unable to connect to server")
     }
   }
 
-
-  // ==========================================
-  // SEARCH
-  // ==========================================
-
-  const filteredRecords = records.filter(
-    (record) =>
-      record.record_date
-        .toLowerCase()
-        .includes(search.toLowerCase())
-  )
-
-
-  // ==========================================
-  // STATISTICS
-  // ==========================================
-
-  const totalEggs = records.reduce(
-    (sum, record) =>
-      sum + Number(record.quantity),
-    0
-  )
-
-
-  const totalRevenue = records.reduce(
-    (sum, record) =>
-      sum + Number(record.total),
-    0
-  )
-
-
-  const averageRate =
-    records.length > 0 && totalEggs > 0
-      ? totalRevenue / totalEggs
-      : 0
-
+  const liveTotal =
+    Number(form.quantity || 0) * Number(form.rate || 0)
 
   return (
-
-    <div className="space-y-8">
-
+    <div className="space-y-7">
 
       {/* HEADER */}
-
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
 
         <div>
-
-          <p className="text-sm font-medium text-orange-600">
-            Farm Management
-          </p>
+          <div className="flex items-center gap-2 text-sm text-orange-500">
+            <EggIcon size={17} />
+            <span>Egg Production</span>
+          </div>
 
           <h1 className="mt-1 text-3xl font-bold text-slate-900">
             Egg Management
           </h1>
 
-          <p className="mt-2 text-sm text-slate-500">
-            Track daily egg production and revenue.
+          <p className="mt-1 text-sm text-slate-500">
+            Track egg production, quantities and earnings.
           </p>
-
         </div>
-
 
         <button
           onClick={openAddModal}
-          className="flex items-center gap-2 rounded-xl bg-orange-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-orange-500/20 transition hover:bg-orange-600"
+          className="flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-600"
         >
-
           <Plus size={18} />
-
           Add Egg Record
-
         </button>
 
       </div>
 
+      {/* EGG HERO */}
+      <div className="rounded-3xl border border-orange-100 bg-white p-7 shadow-sm">
 
-      {/* STATISTICS */}
+        <div className="flex flex-col gap-7 lg:flex-row lg:items-center">
 
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+          <div className="flex flex-1 items-center gap-5">
 
-        <StatCard
-          title="Total Eggs"
-          value={totalEggs.toLocaleString("en-IN")}
-          subtitle="All recorded eggs"
-          icon={<EggIcon size={22} />}
-          iconBg="bg-orange-50"
-          iconColor="text-orange-600"
-        />
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl bg-orange-50 text-orange-500">
+              <EggIcon size={39} />
+            </div>
 
+            <div>
+              <p className="text-sm font-medium text-slate-500">
+                Total Eggs Produced
+              </p>
 
-        <StatCard
-          title="Total Revenue"
-          value={`₹${totalRevenue.toLocaleString(
-            "en-IN",
-            {
-              maximumFractionDigits: 2,
-            }
-          )}`}
-          subtitle="Egg sales"
-          icon={<IndianRupee size={22} />}
-          iconBg="bg-green-50"
-          iconColor="text-green-600"
-        />
+              <h2 className="mt-1 text-4xl font-bold text-slate-900">
+                {totalEggs.toLocaleString("en-IN")}
+              </h2>
 
-
-        <StatCard
-          title="Average Rate"
-          value={`₹${averageRate.toFixed(2)}`}
-          subtitle="Per egg"
-          icon={<TrendingUp size={22} />}
-          iconBg="bg-purple-50"
-          iconColor="text-purple-600"
-        />
-
-
-        <StatCard
-          title="Records"
-          value={records.length}
-          subtitle="Total entries"
-          icon={<CalendarDays size={22} />}
-          iconBg="bg-blue-50"
-          iconColor="text-blue-600"
-        />
-
-      </div>
-
-
-      {/* TABLE */}
-
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-
-
-        {/* TABLE HEADER */}
-
-        <div className="flex flex-col gap-4 border-b border-slate-200 p-6 md:flex-row md:items-center md:justify-between">
-
-          <div>
-
-            <h2 className="text-lg font-bold text-slate-900">
-              Egg Records
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-500">
-              Daily egg production records
-            </p>
+              <p className="mt-2 text-sm text-slate-400">
+                Across {records.length} production records
+              </p>
+            </div>
 
           </div>
 
+          <div className="grid grid-cols-2 gap-3 lg:w-[420px]">
+
+            <div className="rounded-2xl bg-orange-50 p-4">
+              <div className="flex items-center gap-2 text-orange-600">
+                <Hash size={17} />
+                <span className="text-xs font-semibold">
+                  Today's Eggs
+                </span>
+              </div>
+
+              <p className="mt-2 text-2xl font-bold text-slate-900">
+                {todayEggs.toLocaleString("en-IN")}
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-green-50 p-4">
+              <div className="flex items-center gap-2 text-green-600">
+                <IndianRupee size={17} />
+                <span className="text-xs font-semibold">
+                  Revenue
+                </span>
+              </div>
+
+              <p className="mt-2 text-2xl font-bold text-slate-900">
+                ₹{formatCurrency(totalRevenue)}
+              </p>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      {/* EGG STAT CARDS */}
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+
+        <div className="rounded-2xl border border-orange-100 bg-gradient-to-br from-orange-50 to-white p-5">
+          <div className="flex items-center justify-between">
+
+            <div>
+              <p className="text-sm text-slate-500">
+                Today's Production
+              </p>
+
+              <h3 className="mt-2 text-2xl font-bold text-slate-900">
+                {todayEggs.toLocaleString("en-IN")}
+              </h3>
+            </div>
+
+            <div className="rounded-xl bg-white p-3 text-orange-500 shadow-sm">
+              <EggIcon size={21} />
+            </div>
+
+          </div>
+
+          <p className="mt-3 text-xs text-slate-400">
+            ₹{formatCurrency(todayRevenue)} earned today
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-purple-100 bg-gradient-to-br from-purple-50 to-white p-5">
+          <div className="flex items-center justify-between">
+
+            <div>
+              <p className="text-sm text-slate-500">
+                Average Rate
+              </p>
+
+              <h3 className="mt-2 text-2xl font-bold text-slate-900">
+                ₹{averageRate.toFixed(2)}
+              </h3>
+            </div>
+
+            <div className="rounded-xl bg-white p-3 text-purple-600 shadow-sm">
+              <BarChart3 size={21} />
+            </div>
+
+          </div>
+
+          <p className="mt-3 text-xs text-slate-400">
+            Average earning per egg
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-green-100 bg-gradient-to-br from-green-50 to-white p-5">
+          <div className="flex items-center justify-between">
+
+            <div>
+              <p className="text-sm text-slate-500">
+                Total Revenue
+              </p>
+
+              <h3 className="mt-2 text-2xl font-bold text-slate-900">
+                ₹{formatCurrency(totalRevenue)}
+              </h3>
+            </div>
+
+            <div className="rounded-xl bg-white p-3 text-green-600 shadow-sm">
+              <IndianRupee size={21} />
+            </div>
+
+          </div>
+
+          <p className="mt-3 text-xs text-slate-400">
+            From all egg production
+          </p>
+        </div>
+
+      </div>
+
+      {/* PRODUCTION ACTIVITY */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+
+        <div className="mb-6">
+          <h2 className="text-lg font-bold text-slate-900">
+            Production Activity
+          </h2>
+
+          <p className="mt-1 text-sm text-slate-500">
+            Egg production across recent records
+          </p>
+        </div>
+
+        {records.length === 0 ? (
+          <div className="py-10 text-center text-sm text-slate-400">
+            No production activity available
+          </div>
+        ) : (
+          <div className="space-y-4">
+
+            {[...records]
+              .sort(
+                (a, b) =>
+                  new Date(b.record_date) -
+                  new Date(a.record_date)
+              )
+              .slice(0, 6)
+              .map((record) => {
+
+                const quantity = Number(record.quantity || 0)
+
+                const width =
+                  (quantity / maxDailyQuantity) * 100
+
+                return (
+                  <div key={record.egg_id}>
+
+                    <div className="mb-2 flex items-center justify-between">
+
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-50 text-orange-500">
+                          <EggIcon size={16} />
+                        </span>
+
+                        <span className="text-sm font-medium text-slate-700">
+                          {record.record_date}
+                        </span>
+                      </div>
+
+                      <span className="text-sm font-bold text-slate-800">
+                        {quantity.toLocaleString("en-IN")} eggs
+                      </span>
+
+                    </div>
+
+                    <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className="h-full rounded-full bg-orange-400 transition-all"
+                        style={{
+                          width: `${width}%`,
+                        }}
+                      />
+                    </div>
+
+                  </div>
+                )
+              })}
+
+          </div>
+        )}
+
+      </div>
+
+      {/* TABLE */}
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+
+        <div className="flex flex-col gap-4 border-b border-slate-100 p-6 md:flex-row md:items-center md:justify-between">
+
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">
+              Egg Production Records
+            </h2>
+
+            <p className="mt-1 text-sm text-slate-500">
+              Complete production history
+            </p>
+          </div>
 
           <div className="relative w-full md:w-72">
 
@@ -459,173 +464,125 @@ function Eggs() {
               type="text"
               placeholder="Search by date..."
               value={search}
-              onChange={(e) =>
-                setSearch(e.target.value)
-              }
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-orange-500"
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
             />
 
           </div>
 
         </div>
 
+        {loading ? (
+          <div className="p-12 text-center text-sm text-slate-400">
+            Loading egg records...
+          </div>
+        ) : filteredRecords.length === 0 ? (
+          <div className="p-12 text-center">
 
-        {/* TABLE */}
+            <EggIcon
+              size={40}
+              className="mx-auto text-slate-200"
+            />
 
-        <div className="overflow-x-auto">
+            <p className="mt-3 text-sm font-medium text-slate-500">
+              No egg records found
+            </p>
 
-          <table className="w-full text-left">
+            <button
+              onClick={openAddModal}
+              className="mt-4 text-sm font-semibold text-orange-600 hover:text-orange-700"
+            >
+              Add your first record
+            </button>
 
-            <thead className="bg-slate-50">
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
 
-              <tr>
+            <table className="w-full text-left">
 
-                <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  ID
-                </th>
-
-                <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Date
-                </th>
-
-                <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Quantity
-                </th>
-
-                <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Rate
-                </th>
-
-                <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Total
-                </th>
-
-                <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Actions
-                </th>
-
-              </tr>
-
-            </thead>
-
-
-            <tbody className="divide-y divide-slate-100">
-
-              {loading ? (
+              <thead className="bg-slate-50">
 
                 <tr>
+                  <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    Date
+                  </th>
 
-                  <td
-                    colSpan="6"
-                    className="px-6 py-12 text-center text-sm text-slate-400"
-                  >
-                    Loading egg records...
-                  </td>
+                  <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    Eggs
+                  </th>
 
+                  <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    Rate / Egg
+                  </th>
+
+                  <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    Total
+                  </th>
+
+                  <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    Actions
+                  </th>
                 </tr>
 
-              ) : filteredRecords.length === 0 ? (
+              </thead>
 
-                <tr>
+              <tbody className="divide-y divide-slate-100">
 
-                  <td
-                    colSpan="6"
-                    className="px-6 py-12 text-center"
-                  >
-
-                    <div className="flex flex-col items-center">
-
-                      <EggIcon
-                        size={40}
-                        className="text-slate-300"
-                      />
-
-                      <p className="mt-3 text-sm font-medium text-slate-500">
-                        No egg records found
-                      </p>
-
-                      <p className="mt-1 text-xs text-slate-400">
-                        Add your first egg record.
-                      </p>
-
-                    </div>
-
-                  </td>
-
-                </tr>
-
-              ) : (
-
-                filteredRecords.map((record) => (
+                {filteredRecords.map((record) => (
 
                   <tr
                     key={record.egg_id}
-                    className="transition hover:bg-slate-50"
+                    className="transition hover:bg-orange-50/40"
                   >
 
-                    <td className="px-6 py-4 text-sm font-medium text-slate-700">
-                      #{record.egg_id}
+                    <td className="px-6 py-4">
+
+                      <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+
+                        <CalendarDays
+                          size={16}
+                          className="text-orange-500"
+                        />
+
+                        {record.record_date}
+
+                      </div>
+
                     </td>
 
+                    <td className="px-6 py-4">
 
-                    <td className="px-6 py-4 text-sm text-slate-600">
-                      {record.record_date}
+                      <span className="rounded-lg bg-orange-50 px-3 py-1.5 text-sm font-semibold text-orange-700">
+                        {record.quantity.toLocaleString("en-IN")} eggs
+                      </span>
+
                     </td>
-
-
-                    <td className="px-6 py-4 text-sm font-semibold text-slate-800">
-                      {Number(record.quantity).toLocaleString("en-IN")} eggs
-                    </td>
-
 
                     <td className="px-6 py-4 text-sm text-slate-600">
                       ₹{Number(record.rate).toFixed(2)}
                     </td>
 
-
                     <td className="px-6 py-4 text-sm font-bold text-green-600">
-                      ₹
-                      {Number(record.total).toLocaleString(
-                        "en-IN",
-                        {
-                          maximumFractionDigits: 2,
-                        }
-                      )}
+                      ₹{formatCurrency(record.total)}
                     </td>
-
-
-                    {/* ACTIONS */}
 
                     <td className="px-6 py-4">
 
-                      <div className="flex items-center gap-2">
-
+                      <div className="flex justify-end gap-2">
 
                         <button
-                          onClick={() =>
-                            openEditModal(record)
-                          }
-                          className="rounded-lg p-2 text-slate-400 transition hover:bg-blue-50 hover:text-blue-600"
-                          title="Edit"
+                          onClick={() => openEditModal(record)}
+                          className="rounded-lg p-2 text-slate-400 transition hover:bg-orange-50 hover:text-orange-600"
                         >
-
                           <Pencil size={17} />
-
                         </button>
 
-
                         <button
-                          onClick={() =>
-                            handleDelete(
-                              record.egg_id
-                            )
-                          }
+                          onClick={() => setDeleteId(record.egg_id)}
                           className="rounded-lg p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
-                          title="Delete"
                         >
-
                           <Trash2 size={17} />
-
                         </button>
 
                       </div>
@@ -634,190 +591,137 @@ function Eggs() {
 
                   </tr>
 
-                ))
+                ))}
 
-              )}
+              </tbody>
 
-            </tbody>
+            </table>
 
-          </table>
-
-        </div>
+          </div>
+        )}
 
       </div>
 
-
-      {/* ADD / EDIT MODAL */}
-
+      {/* MODAL */}
       {showModal && (
 
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
 
-          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
 
-
-            {/* MODAL HEADER */}
-
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
+            <div className="flex items-center justify-between border-b border-slate-100 p-6">
 
               <div>
-
-                <h2 className="text-xl font-bold text-slate-900">
-
-                  {editingId
-                    ? "Edit Egg Record"
-                    : "Add Egg Record"}
-
+                <h2 className="text-lg font-bold text-slate-900">
+                  {editingId ? "Edit Egg Record" : "Add Egg Record"}
                 </h2>
 
-                <p className="mt-1 text-sm text-slate-500">
-
-                  {editingId
-                    ? "Update egg production details."
-                    : "Enter egg production details."}
-
+                <p className="mt-1 text-xs text-slate-400">
+                  Enter egg production details
                 </p>
-
               </div>
-
 
               <button
                 onClick={closeModal}
-                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"
               >
-
-                <X size={20} />
-
+                <X size={19} />
               </button>
 
             </div>
-
-
-            {/* FORM */}
 
             <form
               onSubmit={handleSubmit}
               className="space-y-5 p-6"
             >
 
-
-              {/* DATE */}
-
               <div>
-
                 <label className="mb-2 block text-sm font-medium text-slate-700">
                   Date
                 </label>
 
                 <input
                   type="date"
-                  name="record_date"
                   value={form.record_date}
-                  onChange={handleChange}
-                  required
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/10"
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      record_date: e.target.value,
+                    })
+                  }
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                 />
-
               </div>
 
-
-              {/* QUANTITY */}
-
               <div>
-
                 <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Egg Quantity
+                  Number of Eggs
                 </label>
 
                 <input
                   type="number"
-                  name="quantity"
-                  value={form.quantity}
-                  onChange={handleChange}
-                  placeholder="Example: 120"
                   min="1"
                   step="1"
-                  required
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/10"
+                  placeholder="e.g. 320"
+                  value={form.quantity}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      quantity: e.target.value,
+                    })
+                  }
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                 />
-
               </div>
 
-
-              {/* RATE */}
-
               <div>
-
                 <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Rate per Egg (₹)
+                  Rate per Egg
                 </label>
 
                 <input
                   type="number"
-                  name="rate"
-                  value={form.rate}
-                  onChange={handleChange}
-                  placeholder="Example: 7"
-                  min="0.01"
                   step="0.01"
-                  required
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/10"
+                  min="0"
+                  placeholder="e.g. 6"
+                  value={form.rate}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      rate: e.target.value,
+                    })
+                  }
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                 />
-
               </div>
 
+              <div className="rounded-xl bg-orange-50 p-4">
 
-              {/* TOTAL */}
+                <p className="text-xs text-orange-500">
+                  Calculated Revenue
+                </p>
 
-              <div className="rounded-xl border border-orange-100 bg-orange-50 p-4">
-
-                <div className="flex items-center justify-between">
-
-                  <span className="text-sm font-medium text-orange-700">
-                    Estimated Total
-                  </span>
-
-                  <span className="text-xl font-bold text-orange-700">
-
-                    ₹
-                    {(
-                      Number(form.quantity || 0) *
-                      Number(form.rate || 0)
-                    ).toFixed(2)}
-
-                  </span>
-
-                </div>
+                <p className="mt-1 text-xl font-bold text-orange-700">
+                  ₹{formatCurrency(liveTotal)}
+                </p>
 
               </div>
-
-
-              {/* BUTTONS */}
 
               <div className="flex gap-3 pt-2">
 
                 <button
                   type="button"
                   onClick={closeModal}
-                  disabled={saving}
-                  className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                  className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50"
                 >
                   Cancel
                 </button>
 
-
                 <button
                   type="submit"
-                  disabled={saving}
-                  className="flex-1 rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex-1 rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white hover:bg-orange-600"
                 >
-
-                  {saving
-                    ? "Saving..."
-                    : editingId
-                    ? "Update Record"
-                    : "Save Record"}
-
+                  {editingId ? "Update Record" : "Save Record"}
                 </button>
 
               </div>
@@ -830,9 +734,51 @@ function Eggs() {
 
       )}
 
-    </div>
+      {/* DELETE */}
+      {deleteId && (
 
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-50 text-red-600">
+              <Trash2 size={21} />
+            </div>
+
+            <h2 className="mt-4 text-lg font-bold text-slate-900">
+              Delete this record?
+            </h2>
+
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              This egg production record will be permanently deleted.
+            </p>
+
+            <div className="mt-6 flex gap-3">
+
+              <button
+                onClick={() => setDeleteId(null)}
+                className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleDelete}
+                className="flex-1 rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white hover:bg-red-700"
+              >
+                Delete
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      )}
+
+    </div>
   )
 }
 
-export default Eggs
+export default Eggs;
